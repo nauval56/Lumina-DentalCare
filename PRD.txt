@@ -1,0 +1,1219 @@
+	# MASTER PROMPT PENGEMBANGAN WEBSITE LUMINA DENTAL CARE
+
+## 1. PERAN DAN TANGGUNG JAWAB
+
+Bertindaklah sebagai Senior Full-Stack Developer, Software Architect, UI/UX Designer, Database Engineer, dan QA Engineer yang berpengalaman membangun aplikasi web manajemen klinik kesehatan.
+
+Tugas Anda adalah merancang dan mengembangkan aplikasi web bernama **Lumina Dental Care**, yaitu sistem informasi manajemen klinik gigi berbasis web yang modern, responsif, aman, dan terintegrasi.
+
+Pengembangan harus mengikuti kebutuhan dalam Product Requirements Document (PRD) Lumina Dental Care versi 1.2 yang dijelaskan dalam prompt ini.
+
+Jangan hanya membuat desain statis atau prototype. Bangun aplikasi dengan fitur yang benar-benar berfungsi, memiliki alur bisnis yang jelas, terhubung dengan database, dan menerapkan autentikasi serta pembatasan hak akses pengguna.
+
+---
+
+## 2. INFORMASI PRODUK
+
+**Nama aplikasi:** Lumina Dental Care
+
+**Tagline:** Senyum Cerah Dimulai Dari Perawatan Terbaik
+
+**Jenis aplikasi:** Dental Clinic Management System
+
+**Model operasional:** Satu klinik dengan satu cabang.
+
+**Bahasa aplikasi:** Bahasa Indonesia.
+
+**Mata uang:** Rupiah (IDR).
+
+**Tujuan aplikasi:**
+
+Membantu klinik gigi mengelola proses pelayanan pasien, appointment, jadwal dokter, antrean, rekam medis, odontogram, resep, persediaan obat, tagihan, pembayaran, dan laporan operasional secara terintegrasi.
+
+Sistem harus memiliki beberapa area pengguna:
+
+1. Public Website.
+2. Patient Portal.
+3. Doctor Portal.
+4. Receptionist Portal.
+5. Admin Dashboard.
+
+---
+
+## 3. TEKNOLOGI YANG WAJIB DIGUNAKAN
+
+Gunakan teknologi berikut sebagai fondasi pengembangan:
+
+### Frontend
+- Nuxt 4.
+- Vue 3 Composition API.
+- TypeScript.
+- Tailwind CSS.
+- Nuxt UI.
+- Pinia.
+- VueUse.
+- ApexCharts.
+- Nuxt Icon.
+
+### Backend
+- Nuxt Server API.
+- TypeScript.
+- Zod untuk validasi data.
+- Server-side authentication dan authorization.
+
+### Database
+- PostgreSQL.
+- Prisma ORM atau Drizzle ORM.
+- Relasi database menggunakan foreign key.
+- Migration untuk pengelolaan perubahan struktur database.
+
+### Testing
+- Vitest untuk unit dan integration testing.
+- Playwright untuk end-to-end testing.
+
+Gunakan versi package yang stabil dan kompatibel satu sama lain. Jangan mencampur pola API Nuxt versi lama dengan Nuxt 4.
+
+---
+
+## 4. IDENTITAS VISUAL DAN DESIGN SYSTEM
+
+Buat desain website dengan konsep:
+
+- Modern Healthcare.
+- Premium Dental Clinic.
+- Minimalist.
+- Elegant.
+- Professional Medical System.
+- Clean Interface.
+- Smooth User Experience.
+
+### Warna utama
+
+| Nama | Kode |
+|---|---|
+| Primary | #0EA5E9 |
+| Primary Dark | #0284C7 |
+| Secondary | #14B8A6 |
+| Accent | #22C55E |
+| White | #FFFFFF |
+| Background | #F8FAFC |
+| Dark | #0F172A |
+| Gray | #64748B |
+| Border | #E2E8F0 |
+
+### Tipografi
+- Heading: Poppins.
+- Body: Inter.
+
+### Gaya komponen
+- Border radius standar 16px.
+- Card radius 20px.
+- Soft shadow.
+- Clean spacing.
+- Konsistensi ukuran typography.
+- Smooth transition.
+- Hover animation yang tidak berlebihan.
+- Ikon konsisten.
+- Layout profesional dan mudah dipahami.
+
+Gunakan warna sesuai fungsi. Jangan menggunakan terlalu banyak warna dekoratif.
+
+### Responsive Design
+
+Website harus mendukung:
+
+- Mobile: 320–767px.
+- Tablet: 768–1023px.
+- Laptop: 1024–1439px.
+- Desktop: 1440px ke atas.
+
+Pastikan sidebar dapat berubah menjadi drawer pada perangkat mobile, tabel memiliki tampilan responsif, dan seluruh tombol nyaman digunakan pada layar sentuh.
+
+---
+
+## 5. SISTEM AUTENTIKASI DAN ROLE ACCESS CONTROL
+
+Implementasikan autentikasi yang aman dengan lima jenis pengguna dan **satu halaman autentikasi terpadu** untuk seluruh pengguna.
+
+### Ketentuan Halaman Autentikasi Terpadu
+- Sediakan satu halaman Login terpadu untuk semua role (`Patient`, `Doctor`, `Receptionist`, dan `Admin`).
+- Sediakan fitur registrasi khusus pasien.
+- Sistem menentukan dashboard secara otomatis berdasarkan role akun setelah login.
+- Jangan menampilkan pilihan portal atau role kepada pengguna saat login.
+- Jangan membuat halaman login terpisah untuk setiap role.
+- Terapkan hak akses berdasarkan role masing-masing pengguna secara server-side, bukan hanya menyembunyikan menu di frontend.
+
+### Visitor
+- Mengakses halaman publik.
+- Melihat informasi klinik.
+- Melihat dokter dan layanan.
+- Melakukan registrasi dan login.
+- Tidak diizinkan melakukan booking appointment sebelum login sebagai pasien (jika menekan tombol "Booking Appointment", sistem mengarahkan ke halaman Login atau Registrasi, lalu setelah berhasil login sebagai pasien diarahkan kembali ke halaman Booking Appointment).
+
+### Patient
+- Mengelola profil.
+- Melakukan booking appointment (khusus pasien yang sudah login).
+- Melihat jadwal konsultasi, status kunjungan, dan riwayat kunjungan.
+- Melihat riwayat pemeriksaan, diagnosis, tindakan, dan rekam medis miliknya.
+- Melihat riwayat resep obat dan memilih tempat pembelian obat (membeli dari klinik atau membeli sendiri di apotek luar).
+- Melihat pesanan obat dari klinik.
+- Melihat invoice, rincian tagihan, dan riwayat pembayaran.
+- Melakukan pembayaran.
+- Melihat notifikasi.
+
+### Doctor
+- Melihat dashboard dokter.
+- Melihat jadwal praktik.
+- Melihat appointment dan daftar pasien yang harus diperiksa.
+- Melihat antrean pasien.
+- Melihat detail informasi dan rekam medis pasien sesuai kewenangan.
+- Membuat rekam medis dan mencatat hasil pemeriksaan, diagnosis, tindakan, layanan, serta informasi tarif yang berlaku pada treatment record.
+- Mengelola odontogram dengan standar FDI.
+- Membuat resep obat berdasarkan kebutuhan medis pasien.
+- Mengirimkan treatment record yang telah selesai dicatat kepada Admin.
+- Dokter hanya bertanggung jawab terhadap pemeriksaan, diagnosis, tindakan medis, dan pencatatan treatment record. Dokter tidak memiliki kewenangan membuat invoice atau memverifikasi pembayaran.
+
+### Receptionist
+- Fokus pada pelayanan front desk dan operasional kunjungan pasien.
+- Mengelola registrasi pasien baru (walk-in) dan pengelolaan data pasien sesuai hak akses.
+- Mencari data pasien dan melihat ringkasan pasien hari ini.
+- Melihat informasi jadwal dokter, daftar appointment hari ini, serta pembuatan dan pengelolaan appointment.
+- Melakukan check-in pasien dan memasukkan pasien ke antrean dokter.
+- Mengelola antrean dokter dan status kunjungan pasien.
+- Mencatat pembayaran langsung di klinik jika diberikan kewenangan.
+- Resepsionis bertanggung jawab atas kedatangan dan antrean pasien. Resepsionis tidak memiliki kewenangan membuat invoice treatment atau memverifikasi pembayaran online.
+
+### Admin
+- Melihat ringkasan operasional klinik.
+- Mengelola pengguna dan hak akses.
+- Mengelola data pasien dan dokter.
+- Mengelola layanan dan tarif.
+- Mengelola jadwal dokter.
+- Mengelola appointment.
+- Memeriksa treatment record (informasi tindakan dan layanan) yang dikirimkan dari dokter, kemudian membuat dan mengelola invoice berdasarkan layanan yang benar-benar diberikan.
+- Mengelola pembayaran dan memverifikasi transaksi pembayaran serta memperbarui status pembayaran di sistem.
+- Mengelola resep dan pesanan obat dari sisi administrasi (penyiapan dan penyerahan obat ketika pasien memilih membeli obat dari klinik).
+- Mengelola inventaris obat serta memantau stok, batch, dan tanggal kedaluwarsa dengan metode FEFO.
+- Mengelola laporan transaksi dan operasional klinik.
+- Mengelola pengaturan sistem.
+- Admin tidak boleh mengubah diagnosis atau keputusan tindakan medis yang menjadi tanggung jawab dokter.
+
+Setiap endpoint harus memeriksa identitas dan hak akses pengguna. Pasien hanya boleh mengakses data miliknya sendiri.
+
+Sediakan:
+- Login.
+- Registrasi.
+- Logout.
+- Forgot password.
+- Reset password.
+- Verifikasi akun.
+- Session management.
+- Proteksi route.
+- Validasi input.
+- Password hashing menggunakan Argon2id atau mekanisme kuat yang setara.
+- Secure HTTP-only cookies.
+- Rate limiting pada endpoint sensitif.
+
+---
+
+## 6. PUBLIC WEBSITE
+
+Buat website publik yang profesional sebagai representasi klinik Lumina Dental Care.
+
+### Halaman Home
+
+Komponen:
+1. Navbar.
+2. Hero section.
+3. CTA Booking Appointment.
+4. Statistik klinik.
+5. Layanan unggulan.
+6. Dokter pilihan.
+7. Keunggulan klinik.
+8. Testimoni pasien.
+9. FAQ.
+10. Footer.
+
+Hero section harus memiliki headline yang menarik, deskripsi singkat, tombol booking, dan visual yang relevan dengan perawatan gigi.
+
+### Halaman About
+- Profil klinik.
+- Visi dan misi.
+- Nilai pelayanan.
+- Fasilitas klinik.
+
+### Halaman Services
+- Daftar layanan.
+- Deskripsi layanan.
+- Harga layanan jika tersedia.
+- Durasi layanan jika tersedia.
+- Detail layanan.
+
+### Halaman Doctors
+- Daftar dokter.
+- Foto dokter.
+- Nama dan gelar.
+- Spesialisasi.
+- Deskripsi singkat.
+- Jadwal praktik.
+- Tombol booking.
+
+### Halaman Articles
+- Daftar artikel kesehatan gigi.
+- Detail artikel.
+- Kategori artikel.
+
+### Halaman Reviews
+- Testimoni dan ulasan pasien.
+
+### Halaman Contact
+- Alamat klinik.
+- Nomor telepon.
+- Email.
+- Jam operasional.
+- Peta lokasi.
+
+---
+
+## 7. PATIENT PORTAL
+
+Buat dashboard khusus pasien dengan sidebar responsif.
+
+### Patient Dashboard
+Tampilkan:
+- Sapaan berdasarkan nama pasien.
+- Ringkasan appointment, appointment berikutnya, jadwal konsultasi, dan status kunjungan.
+- Tombol dan akses booking appointment.
+- Riwayat kunjungan, pemeriksaan, rekam medis, diagnosis, dan tindakan.
+- Riwayat resep obat, informasi pilihan pembelian obat (klinik atau apotek luar), dan pesanan obat dari klinik.
+- Invoice, rincian tagihan, dan riwayat pembayaran.
+- Notifikasi terbaru.
+- Profil pasien.
+
+### Appointment Booking
+
+Booking appointment hanya dapat dilakukan oleh pasien yang sudah login. Jangan mengizinkan visitor melakukan booking tanpa autentikasi.
+
+Alur yang harus diterapkan:
+1. Visitor membuka website dan melihat informasi layanan serta dokter.
+2. Visitor menekan tombol "Booking Appointment".
+3. Jika belum login, arahkan ke halaman Login atau Registrasi.
+4. Setelah berhasil login sebagai pasien, arahkan kembali ke halaman Booking Appointment.
+5. Pasien memilih layanan, dokter, tanggal, dan jam praktik (proses 7 langkah: pilih layanan, pilih dokter, pilih tanggal, pilih slot waktu, isi/konfirmasi informasi kunjungan, tampilkan ringkasan booking, konfirmasi appointment).
+6. Sistem memvalidasi jadwal dokter, jam operasional klinik, dan ketersediaan slot melalui backend.
+7. Jika seluruh persyaratan terpenuhi, appointment dikonfirmasi secara otomatis.
+
+Cegah double booking dengan validasi server dan constraint/transaksi database yang sesuai.
+
+### Medical History & Pilihan Pembelian Resep Obat
+Tampilkan:
+- Tanggal kunjungan.
+- Dokter.
+- Diagnosis.
+- Tindakan.
+- Catatan pemeriksaan.
+- Resep obat beserta mekanisme pilihan tempat pembelian obat (membeli dari klinik atau membeli sendiri di apotek luar).
+- Pesanan obat dari klinik.
+- Riwayat odontogram yang diizinkan.
+
+### Payments
+Tampilkan:
+- Daftar invoice dan rincian tagihan.
+- Total biaya (termasuk biaya obat hanya jika pasien memilih membeli obat dari klinik).
+- Status pembayaran.
+- Metode pembayaran.
+- Riwayat transaksi dan pembayaran.
+- Bukti pembayaran.
+
+### Profile
+- Data pribadi.
+- Informasi kontak.
+- Ubah password.
+- Pengaturan akun.
+
+---
+
+## 8. DOCTOR PORTAL
+
+Buat dashboard dokter dengan informasi yang relevan untuk pelayanan medis. Dokter tidak dapat membuat invoice atau mengelola verifikasi pembayaran.
+
+### Doctor Dashboard
+Tampilkan:
+- Jadwal praktik.
+- Jumlah appointment hari ini dan appointment mendatang.
+- Jumlah pasien selesai diperiksa.
+- Antrean pasien dan daftar pasien yang harus diperiksa.
+
+### Doctor Appointments
+- Daftar pasien yang harus diperiksa.
+- Detail informasi pasien.
+- Jadwal pemeriksaan.
+- Status appointment.
+- Detail appointment.
+- Mulai pemeriksaan.
+
+### Medical Records & Pengiriman Treatment Record ke Admin
+
+Dokter dapat:
+- Membuat rekam medis dan melihat riwayat pemeriksaan pasien.
+- Mengisi keluhan pasien.
+- Mengisi hasil pemeriksaan.
+- Menentukan diagnosis.
+- Menentukan tindakan dan layanan medis beserta informasi tarif yang berlaku pada treatment record.
+- Menambahkan catatan.
+- Menyimpan rekam medis dan mengirimkan treatment record yang telah selesai dicatat kepada Admin.
+
+Sediakan riwayat perubahan yang relevan dan jangan mengizinkan perubahan rekam medis tanpa otorisasi. Dokter hanya bertanggung jawab terhadap pemeriksaan, diagnosis, tindakan medis, dan pencatatan treatment record.
+
+### Odontogram
+
+Buat fitur odontogram khusus klinik gigi menggunakan sistem penomoran FDI.
+
+Fitur:
+- Visualisasi gigi permanen dan gigi susu.
+- Pemilihan gigi.
+- Pencatatan kondisi gigi.
+- Pencatatan permukaan gigi.
+- Diagnosis.
+- Tindakan.
+- Catatan dokter.
+- Riwayat kondisi gigi.
+
+Odontogram harus menyimpan data secara terstruktur, bukan hanya berupa gambar statis.
+
+### Prescriptions
+- Membuat resep berdasarkan hasil pemeriksaan dan kebutuhan medis pasien.
+- Memilih obat.
+- Mengisi dosis.
+- Frekuensi penggunaan.
+- Durasi penggunaan.
+- Jumlah obat.
+- Instruksi penggunaan.
+- Resep dokter disimpan ke dalam rekam medis pasien dan tidak otomatis menjadi transaksi pembelian obat atau langsung mengurangi stok obat klinik.
+
+---
+
+## 9. RECEPTIONIST PORTAL
+
+Buat dashboard resepsionis yang berfokus pada pelayanan front desk dan operasional kunjungan pasien harian klinik. Resepsionis bertanggung jawab atas kedatangan dan antrean pasien. Resepsionis tidak memiliki kewenangan membuat invoice treatment atau memverifikasi pembayaran online.
+
+Fitur:
+
+### Patient Management
+- Ringkasan pasien hari ini.
+- Registrasi pasien baru (walk-in).
+- Tambah, edit, dan pengelolaan data pasien sesuai hak akses.
+- Cari pasien dan lihat detail pasien.
+- Cegah duplikasi data.
+
+### Appointment Management
+- Daftar appointment hari ini dan informasi jadwal dokter.
+- Melihat appointment dan status kunjungan pasien.
+- Pembuatan dan pengelolaan appointment untuk pasien.
+- Mengubah jadwal.
+- Membatalkan appointment sesuai kewenangan.
+
+### Queue Management
+- Check-in pasien dan memasukkan pasien ke antrean dokter.
+- Membuat nomor antrean.
+- Mengubah status antrean.
+- Pengelolaan dan pemantauan antrean dokter.
+
+### Pencatatan Pembayaran Langsung di Klinik
+- Melihat tagihan.
+- Pencatatan pembayaran langsung di klinik jika diberikan kewenangan.
+- Menghasilkan bukti pembayaran.
+
+---
+
+## 10. ADMIN DASHBOARD
+
+Buat dashboard administrator dengan desain premium dan profesional. Admin tidak boleh mengubah diagnosis atau keputusan tindakan medis yang menjadi tanggung jawab dokter.
+
+### Dashboard Overview
+
+Tampilkan ringkasan operasional klinik dan statistik:
+- Total pasien.
+- Total dokter.
+- Appointment hari ini.
+- Appointment mendatang.
+- Total pendapatan.
+- Jumlah transaksi.
+- Obat dengan stok rendah.
+- Obat mendekati kedaluwarsa.
+
+Gunakan ApexCharts untuk:
+- Grafik pendapatan.
+- Grafik jumlah appointment.
+- Grafik kunjungan pasien.
+- Layanan paling banyak digunakan.
+
+### Patient Management
+- Pengelolaan (CRUD) data pasien.
+- Search.
+- Filter.
+- Pagination.
+- Detail pasien.
+- Export data sesuai hak akses.
+
+### Doctor Management
+- Pengelolaan (CRUD) data dokter.
+- Spesialisasi.
+- Jadwal praktik.
+- Status aktif.
+
+### Service Management
+- Pengelolaan (CRUD) layanan dan tarif.
+- Harga layanan.
+- Durasi layanan.
+- Status layanan.
+
+### Schedule Management
+- Pengelolaan jadwal praktik dokter.
+- Hari praktik.
+- Jam mulai dan selesai.
+- Slot appointment.
+- Hari libur.
+
+### Pemeriksaan Treatment Record, Resep & Inventory Management
+
+Fitur wajib:
+- Pemeriksaan treatment record yang dikirimkan dari dokter.
+- Pengelolaan resep dan pesanan obat dari sisi administrasi (proses penyiapan dan penyerahan obat ketika pasien memilih membeli dari klinik).
+- Dashboard stok obat dan pengelolaan inventaris obat.
+- CRUD obat, kategori obat, satuan obat, stok tersedia, dan stok minimum.
+- Pemantauan batch obat dan tanggal kedaluwarsa.
+- Stok masuk, stok keluar, penyesuaian stok, dan riwayat transaksi.
+- Peringatan stok rendah dan peringatan kedaluwarsa.
+
+Gunakan inventory ledger agar seluruh perubahan stok dapat dilacak.
+Terapkan prinsip FEFO (First Expired, First Out).
+Jangan mengurangi stok hanya karena dokter membuat resep; stok obat berkurang ketika obat benar-benar diserahkan kepada pasien yang membeli obat dari klinik.
+Jangan izinkan stok menjadi negatif dan jangan mengeluarkan obat kedaluwarsa.
+
+### Invoice & Payment Management
+- Pemeriksaan informasi tindakan dan layanan dari treatment record dokter.
+- Pembuatan dan pengelolaan invoice berdasarkan layanan yang benar-benar diberikan (ditambah biaya obat apabila pasien membeli obat dari klinik).
+- Daftar tagihan dan daftar pembayaran.
+- Pengelolaan pembayaran, verifikasi transaksi pembayaran, dan pembaruan status pembayaran di sistem.
+- Pembayaran manual dan pembayaran online.
+- Status transaksi, detail transaksi, dan laporan pembayaran.
+
+### Reports
+- Laporan pasien.
+- Laporan appointment.
+- Laporan kunjungan.
+- Laporan pendapatan.
+- Laporan pembayaran.
+- Laporan persediaan obat.
+
+Sediakan filter periode dan export sesuai kewenangan.
+
+### Settings
+- Profil klinik.
+- Informasi kontak.
+- Jam operasional.
+- Pengaturan sistem.
+- Pengaturan akun.
+- Pengaturan notifikasi.
+
+---
+
+## 11. APPOINTMENT VERIFICATION SYSTEM
+
+Sistem harus memiliki mekanisme verifikasi otomatis sebelum mengonfirmasi appointment.
+
+Periksa:
+- Dokter tersedia.
+- Dokter memiliki jadwal praktik.
+- Slot masih tersedia.
+- Tidak ada konflik jadwal.
+- Layanan tersedia.
+- Durasi layanan sesuai.
+- Data pasien valid.
+- Klinik beroperasi pada waktu tersebut.
+
+Jika semua validasi berhasil, appointment berubah menjadi Confirmed.
+
+Jika tidak berhasil, berikan pesan kesalahan yang jelas dan informatif.
+
+Status appointment:
+- Pending.
+- Confirmed.
+- Checked In.
+- In Treatment.
+- Completed.
+- Cancelled.
+- Rescheduled.
+- No Show.
+
+Validasi harus dilakukan di backend agar tidak dapat dilewati dengan manipulasi frontend.
+
+---
+
+## 12. PAYMENT SYSTEM
+
+Sediakan dua metode pembayaran.
+
+### Manual Payment
+- Cash.
+- Pembayaran langsung di klinik.
+- Verifikasi oleh resepsionis.
+
+### Online Payment
+- Bank transfer.
+- QRIS.
+- Virtual Account.
+- E-wallet.
+- Payment gateway.
+
+Gunakan adapter/service layer agar penyedia payment gateway dapat diganti tanpa mengubah seluruh logika pembayaran.
+
+Persyaratan keamanan:
+- Validasi webhook.
+- Verifikasi signature.
+- Idempotency.
+- Penyimpanan provider transaction ID.
+- Pencatatan riwayat pembayaran.
+- Rekonsiliasi status pembayaran.
+
+Jangan menyimpan informasi kartu pembayaran sensitif.
+
+Apabila kredensial payment gateway belum tersedia, buat mock adapter untuk development dan tandai dengan jelas bahwa transaksi tersebut bukan pembayaran sungguhan.
+
+---
+
+## 13. DATABASE DESIGN
+
+Gunakan PostgreSQL dan desain database yang terstruktur serta ternormalisasi.
+
+Entitas utama:
+
+1. Users.
+2. Roles.
+3. Patients.
+4. Doctors.
+5. Services.
+6. Schedules.
+7. Appointments.
+8. Queues.
+9. MedicalRecords.
+10. Diagnoses.
+11. Treatments.
+12. Teeth.
+13. Odontograms.
+14. Prescriptions.
+15. Medicines.
+16. PrescriptionItems.
+17. Inventory.
+18. MedicineBatches.
+19. InventoryTransactions.
+20. Invoices.
+21. Payments.
+22. PaymentTransactions.
+23. PaymentGatewayEvents.
+24. Notifications.
+25. Articles.
+26. Reviews.
+27. AuditLogs.
+
+Setiap tabel harus memiliki:
+- Primary key.
+- Foreign key yang sesuai.
+- Created at.
+- Updated at jika relevan.
+- Constraint.
+- Index untuk pencarian dan relasi penting.
+
+Gunakan transaksi database untuk proses yang melibatkan perubahan beberapa data sekaligus, khususnya appointment, pembayaran, dan persediaan obat.
+
+Sistem hanya memiliki satu klinik. Jangan membuat arsitektur multi-cabang atau tabel manajemen cabang.
+
+---
+
+## 14. API DAN BACKEND
+
+Buat API yang terstruktur berdasarkan modul.
+
+Contoh endpoint:
+
+### Authentication
+- POST /api/auth/register
+- POST /api/auth/login
+- POST /api/auth/logout
+- POST /api/auth/forgot-password
+- POST /api/auth/reset-password
+
+### Patients
+- GET /api/patients
+- POST /api/patients
+- GET /api/patients/:id
+- PATCH /api/patients/:id
+- DELETE /api/patients/:id
+
+### Doctors
+- GET /api/doctors
+- POST /api/doctors
+- PATCH /api/doctors/:id
+- DELETE /api/doctors/:id
+
+### Appointments
+- GET /api/appointments
+- POST /api/appointments
+- GET /api/appointments/:id
+- PATCH /api/appointments/:id
+- POST /api/appointments/:id/cancel
+- GET /api/schedules/availability
+
+### Medical Records
+- GET /api/medical-records
+- POST /api/medical-records
+- GET /api/medical-records/:id
+- PATCH /api/medical-records/:id
+
+### Inventory
+- GET /api/medicines
+- POST /api/medicines
+- GET /api/inventory
+- POST /api/inventory/stock-in
+- POST /api/inventory/stock-out
+- POST /api/inventory/adjustment
+- GET /api/inventory/transactions
+
+### Payments
+- GET /api/invoices
+- POST /api/invoices
+- POST /api/payments/manual
+- POST /api/payments/online
+- POST /api/payments/webhook
+
+### Reports
+- GET /api/reports/revenue
+- GET /api/reports/appointments
+- GET /api/reports/patients
+- GET /api/reports/inventory
+
+Sesuaikan nama dan struktur endpoint dengan konvensi Nuxt Server API yang digunakan. Jangan membuat endpoint contoh yang tidak terimplementasi.
+
+---
+
+## 15. STRUKTUR FOLDER
+
+Gunakan struktur modular yang sesuai dengan Nuxt 4.
+
+Contoh:
+
+app/
+├── assets/
+├── components/
+│   ├── common/
+│   ├── landing/
+│   ├── dashboard/
+│   ├── patient/
+│   ├── doctor/
+│   ├── receptionist/
+│   ├── admin/
+│   ├── appointment/
+│   ├── medical/
+│   ├── odontogram/
+│   ├── inventory/
+│   └── payment/
+├── composables/
+├── layouts/
+├── middleware/
+├── pages/
+│   ├── index.vue
+│   ├── about/
+│   ├── services/
+│   ├── doctors/
+│   ├── auth/
+│   ├── patient/
+│   ├── doctor/
+│   ├── receptionist/
+│   └── admin/
+├── plugins/
+├── stores/
+├── types/
+└── utils/
+
+server/
+├── api/
+├── middleware/
+├── services/
+├── repositories/
+└── utils/
+
+prisma/
+├── schema.prisma
+└── migrations/
+
+tests/
+├── unit/
+├── integration/
+└── e2e/
+
+public/
+
+Sesuaikan struktur akhir dengan konvensi Nuxt 4. Jangan membuat struktur folder yang hanya berisi file kosong.
+
+---
+
+## 16. KOMPONEN REUSABLE
+
+Buat komponen reusable berikut:
+
+- Navbar.
+- Footer.
+- HeroSection.
+- StatisticCard.
+- FeatureCard.
+- DoctorCard.
+- ReviewCard.
+- AppointmentCard.
+- DashboardCard.
+- ProfileCard.
+- NotificationCard.
+- CalendarWidget.
+- RevenueChart.
+- PatientTable.
+- DoctorTable.
+- Sidebar.
+- MobileDrawer.
+- BottomNavigation.
+- DataTable.
+- SearchInput.
+- FilterDropdown.
+- StatusBadge.
+- ConfirmDialog.
+- FormField.
+- EmptyState.
+- LoadingSkeleton.
+- ErrorState.
+
+Gunakan komponen yang konsisten agar tidak terjadi duplikasi kode.
+
+---
+
+## 17. UI/UX DAN INTERAKSI
+
+Seluruh fitur harus memiliki kondisi:
+
+- Loading.
+- Success.
+- Error.
+- Empty.
+- Disabled.
+- Validation.
+- Confirmation.
+
+Gunakan:
+- Skeleton loading.
+- Toast notification.
+- Modal konfirmasi.
+- Form validation.
+- Pagination.
+- Search dan filter.
+- Breadcrumb.
+- Responsive sidebar.
+- Responsive table.
+- Chart yang adaptif.
+
+Semua tombol, form, menu, filter, dan navigasi harus memiliki fungsi nyata.
+
+Jangan membuat tombol dekoratif yang tidak memiliki aksi.
+
+Jangan menggunakan data statis sebagai pengganti proses backend pada fitur yang seharusnya menyimpan atau membaca data.
+
+Seed data boleh digunakan untuk demonstrasi dan pengujian, tetapi harus dibedakan dari data produksi.
+
+---
+
+## 18. KEAMANAN DAN PRIVASI
+
+Karena aplikasi mengelola data kesehatan pasien, keamanan merupakan persyaratan utama.
+
+Implementasikan:
+- Password hashing.
+- RBAC.
+- Server-side authorization.
+- Validasi input.
+- Proteksi SQL injection.
+- Proteksi XSS.
+- Proteksi CSRF sesuai mekanisme autentikasi.
+- Rate limiting.
+- Secure session.
+- Audit log.
+- Validasi akses rekam medis.
+- Pembatasan akses dokumen medis.
+- Backup database.
+- Pengelolaan secret melalui environment variables.
+
+Jangan pernah menaruh secret key, database password, atau payment gateway credentials di frontend.
+
+Jangan menampilkan data medis pada dashboard yang tidak memiliki kewenangan untuk melihatnya.
+
+---
+
+## 19. ACCEPTANCE CRITERIA
+
+Aplikasi dinyatakan memenuhi kebutuhan apabila:
+
+1. Pengguna dapat melakukan login dan logout.
+2. Setiap role memiliki akses sesuai kewenangannya.
+3. Pasien dapat registrasi secara mandiri.
+4. Resepsionis dapat mendaftarkan pasien.
+5. Sistem dapat mencegah duplikasi pasien.
+6. Pasien dapat melakukan booking appointment.
+7. Sistem dapat memverifikasi ketersediaan dokter secara otomatis.
+8. Sistem dapat mencegah double booking.
+9. Dokter dapat mengelola rekam medis.
+10. Dokter dapat menggunakan odontogram.
+11. Dokter dapat membuat resep.
+12. Sistem dapat mengelola stok obat.
+13. Sistem dapat melacak batch dan tanggal kedaluwarsa.
+14. Stok tidak dapat berkurang hingga negatif.
+15. Resepsionis dapat memverifikasi pembayaran manual.
+16. Sistem dapat menangani status pembayaran online.
+17. Admin dapat melihat laporan operasional.
+18. Semua perubahan penting tercatat dalam audit log.
+19. Seluruh halaman responsif.
+20. Tidak ada tombol atau fitur utama yang hanya menjadi dekorasi.
+
+---
+
+## 20. ATURAN PENGERJAAN
+
+Ikuti ketentuan berikut selama pengembangan:
+
+1. Analisis kebutuhan dan arsitektur sebelum menulis kode.
+2. Buat struktur folder yang jelas.
+3. Buat desain database dan relasi terlebih dahulu.
+4. Implementasikan autentikasi dan RBAC sebelum modul operasional.
+5. Kembangkan aplikasi secara modular.
+6. Pisahkan frontend, backend, business logic, dan database access.
+7. Gunakan TypeScript dengan tipe data yang jelas.
+8. Hindari penggunaan `any` tanpa alasan kuat.
+9. Gunakan reusable components.
+10. Jangan menumpuk seluruh logika di satu file Vue.
+11. Gunakan validasi pada frontend dan backend.
+12. Jangan menganggap data mock sebagai data produksi.
+13. Jangan membuat fitur yang bertentangan dengan PRD.
+14. Jangan mengimplementasikan multi-cabang.
+15. Jangan menambahkan bahasa Inggris.
+16. Jangan membuat integrasi pembayaran palsu yang diklaim sebagai transaksi nyata.
+17. Dokumentasikan fitur yang masih memerlukan kredensial layanan eksternal.
+18. Jalankan testing setelah setiap modul selesai.
+
+Jika terdapat keputusan teknis yang belum ditentukan, pilih solusi yang paling aman, sederhana, dan mudah dikembangkan. Dokumentasikan asumsi tersebut dan jangan mengubah kebutuhan bisnis utama tanpa persetujuan.
+
+---
+
+## 21. STRATEGI PENGEMBANGAN
+
+Jangan mengembangkan seluruh aplikasi sekaligus dalam satu proses tanpa validasi.
+
+Kerjakan secara bertahap:
+
+**Tahap 1 — Foundation**
+- Setup Nuxt 4.
+- Setup Tailwind CSS dan Nuxt UI.
+- Design system.
+- Struktur folder.
+- Database PostgreSQL.
+- ORM dan migration.
+
+**Tahap 2 — Authentication**
+- Login.
+- Registrasi.
+- Role management.
+- Middleware.
+- RBAC.
+- Session management.
+
+**Tahap 3 — Public Website**
+- Home.
+- About.
+- Services.
+- Doctors.
+- Articles.
+- Contact.
+
+**Tahap 4 — Patient Portal**
+- Dashboard.
+- Profile.
+- Appointment booking.
+- Medical history.
+- Payments.
+- Notifications.
+
+**Tahap 5 — Doctor Portal**
+- Dashboard.
+- Schedule.
+- Appointment.
+- Medical records.
+- Odontogram.
+- Prescriptions.
+
+**Tahap 6 — Receptionist Portal**
+- Patient management.
+- Appointment management.
+- Check-in.
+- Queue.
+- Payment verification.
+
+**Tahap 7 — Admin Dashboard**
+- User management.
+- Patient management.
+- Doctor management.
+- Service management.
+- Schedule management.
+- Inventory.
+- Payment management.
+- Reports.
+
+**Tahap 8 — Integration**
+- Appointment verification.
+- Inventory ledger.
+- Prescription integration.
+- Payment gateway.
+- Notification system.
+
+**Tahap 9 — Testing dan Deployment**
+- Unit testing.
+- Integration testing.
+- End-to-end testing.
+- Security testing.
+- Performance optimization.
+- Deployment.
+- Dokumentasi.
+
+Setiap tahap harus dapat diuji sebelum melanjutkan ke tahap berikutnya.
+
+---
+
+## 22. OUTPUT YANG HARUS DIHASILKAN
+
+Pada akhir pengembangan, hasilkan:
+
+1. Source code aplikasi lengkap.
+2. Database schema.
+3. Database migration.
+4. Seed data untuk development.
+5. Autentikasi dan RBAC.
+6. Seluruh halaman sesuai PRD.
+7. API backend.
+8. Reusable components.
+9. Integrasi database.
+10. Testing.
+11. File `.env.example`.
+12. Dokumentasi instalasi.
+13. Dokumentasi struktur aplikasi.
+14. Dokumentasi API.
+15. README.md.
+
+Pastikan aplikasi dapat dijalankan secara lokal melalui instruksi yang jelas.
+
+**TUJUAN AKHIR:**
+
+Bangun Lumina Dental Care sebagai aplikasi web manajemen klinik gigi yang benar-benar berfungsi, memiliki desain premium dan profesional, responsif di semua perangkat, aman dalam pengelolaan data kesehatan, serta mengintegrasikan seluruh proses operasional klinik dalam satu sistem.
+
+Prioritaskan kualitas arsitektur, konsistensi UI/UX, keamanan data, dan keberfungsian setiap fitur dibandingkan sekadar menghasilkan banyak halaman.
+
+---
+
+# PROMPT PERBAIKAN UI/UX LUMINA DENTAL CARE
+
+Lakukan perbaikan dan penyempurnaan User Interface (UI) dan User Experience (UX) pada website Lumina Dental Care agar terlihat lebih modern, profesional, elegan, konsisten, dan mudah digunakan.
+
+Lakukan penyempurnaan pada aplikasi yang sudah ada. Pertahankan fitur, fungsi, dan struktur sistem yang telah berjalan. Jangan membangun ulang aplikasi dari awal.
+
+## 1. Perbaikan Alur Registrasi dan Login
+
+Gunakan **satu halaman autentikasi terpadu** untuk seluruh pengguna.
+
+- Sediakan satu halaman Login untuk semua role.
+- Sediakan fitur registrasi khusus pasien.
+- Role yang tersedia: Patient, Doctor, Receptionist, dan Admin.
+- Sistem menentukan dashboard secara otomatis berdasarkan role akun setelah login.
+- Jangan menampilkan pilihan portal atau role kepada pengguna saat login.
+- Terapkan hak akses berdasarkan role masing-masing pengguna.
+
+## 2. Perbaikan Booking Appointment
+
+Booking appointment hanya dapat dilakukan oleh pasien yang sudah login.
+
+Alur yang harus diterapkan:
+
+1. Visitor membuka website dan melihat informasi layanan serta dokter.
+2. Visitor menekan tombol "Booking Appointment".
+3. Jika belum login, arahkan ke halaman Login atau Registrasi.
+4. Setelah berhasil login sebagai pasien, arahkan kembali ke halaman Booking Appointment.
+5. Pasien memilih layanan, dokter, tanggal, dan jam praktik.
+6. Sistem memvalidasi jadwal dokter, jam operasional klinik, dan ketersediaan slot.
+7. Jika seluruh persyaratan terpenuhi, appointment dikonfirmasi secara otomatis.
+
+Jangan mengizinkan visitor melakukan booking tanpa autentikasi.
+
+## 3. Perbaikan Alur Pelayanan Medis, Resep Obat, dan Pembayaran
+
+Terapkan alur operasional berikut secara konsisten pada seluruh halaman dan dashboard.
+
+### A. Alur Pelayanan dan Invoice
+
+1. **Pasien:** Melakukan registrasi dan appointment, kemudian datang ke klinik.
+2. **Resepsionis:** Melakukan check-in dan memasukkan pasien ke antrean dokter.
+3. **Dokter:** Melakukan pemeriksaan, diagnosis, dan tindakan medis terhadap pasien.
+4. **Dokter:** Mencatat hasil pemeriksaan, diagnosis, tindakan, layanan, serta informasi tarif yang berlaku pada treatment record.
+5. **Dokter → Admin:** Mengirimkan treatment record yang telah selesai dicatat.
+6. **Admin:** Memeriksa informasi tindakan dan layanan dari dokter, kemudian membuat invoice berdasarkan layanan yang benar-benar diberikan.
+7. **Pasien:** Menerima informasi tagihan dan melakukan pembayaran.
+8. **Admin:** Memverifikasi pembayaran dan memperbarui status pembayaran di sistem.
+
+Dokter hanya bertanggung jawab terhadap pemeriksaan, diagnosis, tindakan medis, dan pencatatan treatment record. Dokter tidak memiliki kewenangan membuat invoice atau memverifikasi pembayaran.
+
+### B. Alur Resep dan Pembelian Obat
+
+Terapkan mekanisme resep dokter yang memungkinkan pasien memilih tempat pembelian obat.
+
+1. **Dokter:** Memberikan resep obat berdasarkan hasil pemeriksaan dan kebutuhan medis pasien.
+2. **Sistem:** Menyimpan resep ke dalam rekam medis pasien dan menampilkan informasi resep pada Patient Dashboard.
+3. **Pasien:** Dapat memilih untuk membeli obat dari klinik atau membeli sendiri di apotek luar.
+4. **Jika membeli dari klinik:**
+   - Sistem memeriksa ketersediaan stok obat.
+   - Sistem mencatat pesanan obat pasien.
+   - Admin mengelola proses penyiapan dan penyerahan obat.
+   - Biaya obat dimasukkan ke dalam invoice pasien.
+   - Stok obat berkurang ketika obat benar-benar diserahkan kepada pasien.
+5. **Jika membeli di apotek luar:**
+   - Resep tetap tersimpan dalam riwayat medis pasien.
+   - Tidak ada transaksi pembelian obat dari klinik.
+   - Biaya obat tidak dimasukkan ke dalam invoice klinik.
+   - Stok obat klinik tidak berubah.
+
+Ketentuan penting:
+- Resep dokter tidak otomatis menjadi transaksi pembelian obat.
+- Pasien tidak diwajibkan membeli obat dari klinik.
+- Pembelian obat di klinik harus mengikuti resep dokter dan ketersediaan stok.
+- Jangan mengurangi stok hanya karena dokter membuat resep.
+- Pengelolaan stok harus memperhatikan batch, tanggal kedaluwarsa, dan metode FEFO.
+- Dokter tetap bertanggung jawab atas keputusan medis, sedangkan Admin mengelola persediaan dan transaksi obat.
+
+## 4. Perbaikan Dashboard Berdasarkan Role
+
+Setiap role harus memiliki dashboard, navigasi, dan hak akses sesuai tanggung jawabnya.
+
+### A. Patient Dashboard
+
+Tampilkan:
+- Ringkasan appointment.
+- Booking appointment.
+- Jadwal konsultasi dan status kunjungan.
+- Riwayat pemeriksaan dan rekam medis.
+- Riwayat diagnosis dan tindakan.
+- Riwayat resep obat.
+- Informasi pilihan pembelian obat.
+- Pesanan obat dari klinik.
+- Invoice dan rincian tagihan.
+- Riwayat pembayaran.
+- Profil pasien.
+
+### B. Doctor Dashboard
+
+Tampilkan:
+- Jadwal praktik.
+- Antrean pasien.
+- Daftar pasien yang harus diperiksa.
+- Detail informasi pasien.
+- Rekam medis pasien.
+- Pencatatan diagnosis.
+- Odontogram dengan standar FDI.
+- Pencatatan tindakan dan layanan medis.
+- Pembuatan resep obat.
+- Riwayat pemeriksaan pasien.
+- Pengiriman treatment record kepada Admin.
+
+Dokter tidak dapat membuat invoice atau mengelola verifikasi pembayaran.
+
+### C. Receptionist Dashboard
+
+Fokus pada pelayanan front desk dan operasional kunjungan pasien.
+
+Tampilkan:
+- Ringkasan pasien hari ini.
+- Registrasi pasien baru (walk-in).
+- Pengelolaan data pasien sesuai hak akses.
+- Daftar appointment hari ini.
+- Pembuatan dan pengelolaan appointment.
+- Check-in pasien.
+- Pengelolaan antrean dokter.
+- Status kunjungan pasien.
+- Informasi jadwal dokter.
+- Pencatatan pembayaran langsung di klinik jika diberikan kewenangan.
+
+Resepsionis bertanggung jawab atas kedatangan dan antrean pasien. Resepsionis tidak memiliki kewenangan membuat invoice treatment atau memverifikasi pembayaran online.
+
+### D. Admin Dashboard
+
+Tampilkan:
+- Ringkasan operasional klinik.
+- Pengelolaan data pasien dan dokter.
+- Pengelolaan layanan dan tarif.
+- Pengelolaan jadwal dokter.
+- Pemeriksaan treatment record dari dokter.
+- Pembuatan dan pengelolaan invoice.
+- Pengelolaan pembayaran dan verifikasi transaksi.
+- Pengelolaan resep dan pesanan obat dari sisi administrasi.
+- Pengelolaan inventaris obat.
+- Pemantauan stok, batch, dan tanggal kedaluwarsa.
+- Laporan transaksi dan operasional klinik.
+- Pengelolaan pengguna dan hak akses.
+
+Admin tidak boleh mengubah diagnosis atau keputusan tindakan medis yang menjadi tanggung jawab dokter.
+
+## 5. Perbaikan Navigasi dan Pengalaman Pengguna
+
+- Buat sidebar dashboard yang rapi dan mudah dipahami.
+- Gunakan navigasi berdasarkan role dan hak akses.
+- Tampilkan notifikasi untuk appointment, antrean, resep, pesanan obat, invoice, dan pembayaran.
+- Gunakan status yang jelas seperti Pending, Confirmed, Waiting, In Progress, Completed, Paid, dan Unpaid sesuai konteks.
+- Sediakan halaman detail untuk setiap data penting.
+- Gunakan konfirmasi sebelum tindakan yang berdampak pada data.
+- Berikan pesan sukses dan gagal yang informatif.
+- Pastikan tidak ada tombol, menu, atau tautan yang hanya bersifat dekoratif.
+
+## 6. Arahan Desain UI/UX
+
+Gunakan konsep **Modern Healthcare** dengan karakteristik:
+
+- Clean, minimalis, modern, dan premium.
+- Warna utama biru muda, putih, dan teal.
+- Tipografi modern dan mudah dibaca.
+- Card dengan rounded corners yang konsisten.
+- Sidebar dashboard yang rapi.
+- Navbar yang konsisten.
+- Ikon yang seragam.
+- Spacing dan alignment konsisten.
+- Tabel data yang mudah dibaca.
+- Form input yang sederhana dan jelas.
+- Status menggunakan badge yang konsisten.
+- Tampilan responsif untuk desktop, tablet, dan mobile.
+
+## 7. Ketentuan Implementasi
+
+- Pertahankan seluruh fitur dan fungsi yang sudah berjalan.
+- Jangan mengubah struktur database tanpa kebutuhan yang jelas.
+- Jangan membuat halaman login terpisah untuk setiap role.
+- Jangan menyediakan booking sebelum pasien login.
+- Jangan memberikan akses fitur di luar kewenangan masing-masing role.
+- Jangan membuat tombol atau menu yang hanya bersifat dekoratif.
+- Pastikan seluruh navigasi, formulir, tombol, dan interaksi berfungsi.
+- Jangan mengubah alur bisnis yang telah ditentukan.
+- Pastikan pencatatan transaksi dan perubahan data penting memiliki audit trail.
+- Pastikan data rekam medis dan informasi pasien hanya dapat diakses oleh pengguna yang berwenang.
+- Lakukan perbaikan pada UI yang sudah ada, bukan membangun ulang aplikasi dari awal.
+
+## TUJUAN AKHIR PERBAIKAN UI/UX
+
+Menghasilkan website Lumina Dental Care yang modern, profesional, responsif, dan mudah digunakan dengan pembagian tanggung jawab yang jelas antara Patient, Doctor, Receptionist, dan Admin.
+
+Pastikan seluruh alur autentikasi, booking appointment, check-in, antrean, pemeriksaan medis, pencatatan tindakan, resep obat, pilihan pembelian obat, pengelolaan inventaris, pembuatan invoice, dan pembayaran berjalan secara konsisten sesuai proses operasional klinik.

@@ -1,0 +1,820 @@
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "mysql"
+  url      = env("DATABASE_URL")
+}
+
+// ============================================================================
+// ENUMS
+// ============================================================================
+
+enum RoleCode {
+  VISITOR
+  PATIENT
+  DOCTOR
+  RECEPTIONIST
+  ADMIN
+}
+
+enum Gender {
+  LAKI_LAKI
+  PEREMPUAN
+}
+
+enum AppointmentStatus {
+  PENDING
+  CONFIRMED
+  CHECKED_IN
+  IN_TREATMENT
+  COMPLETED
+  CANCELLED
+  RESCHEDULED
+  NO_SHOW
+}
+
+enum QueueStatus {
+  WAITING
+  CALLED
+  IN_PROGRESS
+  COMPLETED
+  SKIPPED
+  CANCELLED
+}
+
+enum ToothType {
+  PERMANENT
+  DECIDUOUS
+}
+
+enum ToothCondition {
+  SEHAT
+  KARIES
+  TAMBALAN
+  HILANG
+  SISA_AKAR
+  IMPLAN
+  MAHKOTA
+  PERAWATAN_SALURAN_AKAR
+  GOYANG
+  FRAKTUR
+}
+
+enum InventoryTransactionType {
+  STOCK_IN
+  STOCK_OUT
+  ADJUSTMENT_IN
+  ADJUSTMENT_OUT
+  EXPIRED_DISPOSAL
+  PRESCRIPTION_DISPENSE
+}
+
+enum InvoiceStatus {
+  UNPAID
+  PARTIALLY_PAID
+  PAID
+  CANCELLED
+  REFUNDED
+}
+
+enum PaymentMethod {
+  CASH
+  BANK_TRANSFER
+  QRIS
+  VIRTUAL_ACCOUNT
+  EWALLET
+}
+
+enum PaymentStatus {
+  PENDING
+  WAITING_VERIFICATION
+  SUCCESS
+  FAILED
+  EXPIRED
+  REFUNDED
+}
+
+enum NotificationType {
+  APPOINTMENT
+  QUEUE
+  MEDICAL
+  PAYMENT
+  INVENTORY
+  SYSTEM
+}
+
+// ============================================================================
+// 1-2. USERS, ROLES & AUTHENTICATION
+// ============================================================================
+
+model Role {
+  id          String   @id @default(cuid()) @db.VarChar(36)
+  code        RoleCode @unique
+  name        String   @db.VarChar(80)
+  description String?  @db.VarChar(255)
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+
+  users User[]
+
+  @@map("roles")
+}
+
+model User {
+  id              String    @id @default(cuid()) @db.VarChar(36)
+  roleId          String    @db.VarChar(36)
+  fullName        String    @db.VarChar(150)
+  email           String    @unique @db.VarChar(180)
+  phone           String?   @db.VarChar(30)
+  passwordHash    String    @db.VarChar(255)
+  avatarUrl       String?   @db.VarChar(500)
+  isActive        Boolean   @default(true)
+  isEmailVerified Boolean   @default(false)
+  emailVerifiedAt DateTime?
+  lastLoginAt     DateTime?
+  createdAt       DateTime  @default(now())
+  updatedAt       DateTime  @updatedAt
+
+  role                    Role                     @relation(fields: [roleId], references: [id])
+  patient                 Patient?
+  doctor                  Doctor?
+  sessions                Session[]
+  passwordResetTokens     PasswordResetToken[]
+  emailVerificationTokens EmailVerificationToken[]
+  notifications           Notification[]
+  auditLogs               AuditLog[]
+  verifiedPayments        Payment[]                @relation("PaymentVerifier")
+  inventoryTransactions   InventoryTransaction[]   @relation("InventoryActor")
+  authoredArticles        Article[]                @relation("ArticleAuthor")
+
+  @@index([roleId])
+  @@index([email])
+  @@index([phone])
+  @@map("users")
+}
+
+model Session {
+  id        String   @id @default(cuid()) @db.VarChar(36)
+  userId    String   @db.VarChar(36)
+  tokenHash String   @unique @db.VarChar(128)
+  userAgent String?  @db.VarChar(500)
+  ipAddress String?  @db.VarChar(64)
+  expiresAt DateTime
+  createdAt DateTime @default(now())
+
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@index([userId])
+  @@index([expiresAt])
+  @@map("sessions")
+}
+
+model PasswordResetToken {
+  id        String    @id @default(cuid()) @db.VarChar(36)
+  userId    String    @db.VarChar(36)
+  tokenHash String    @unique @db.VarChar(128)
+  expiresAt DateTime
+  usedAt    DateTime?
+  createdAt DateTime  @default(now())
+
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@index([userId])
+  @@index([expiresAt])
+  @@map("password_reset_tokens")
+}
+
+model EmailVerificationToken {
+  id        String    @id @default(cuid()) @db.VarChar(36)
+  userId    String    @db.VarChar(36)
+  tokenHash String    @unique @db.VarChar(128)
+  expiresAt DateTime
+  usedAt    DateTime?
+  createdAt DateTime  @default(now())
+
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@index([userId])
+  @@index([expiresAt])
+  @@map("email_verification_tokens")
+}
+
+// ============================================================================
+// 3-6. PATIENTS, DOCTORS, SERVICES & SCHEDULES
+// ============================================================================
+
+model Patient {
+  id               String    @id @default(cuid()) @db.VarChar(36)
+  userId           String?   @unique @db.VarChar(36)
+  medicalRecordNo  String    @unique @db.VarChar(40)
+  nik              String?   @unique @db.VarChar(20)
+  fullName         String    @db.VarChar(150)
+  email            String?   @db.VarChar(180)
+  phone            String    @db.VarChar(30)
+  dateOfBirth      DateTime?
+  gender           Gender?
+  bloodType        String?   @db.VarChar(5)
+  address          String?   @db.Text
+  allergies        String?   @db.Text
+  medicalNotes     String?   @db.Text
+  emergencyContact String?   @db.VarChar(150)
+  emergencyPhone   String?   @db.VarChar(30)
+  createdAt        DateTime  @default(now())
+  updatedAt        DateTime  @updatedAt
+
+  user           User?           @relation(fields: [userId], references: [id], onDelete: SetNull)
+  appointments   Appointment[]
+  queues         Queue[]
+  medicalRecords MedicalRecord[]
+  odontograms    Odontogram[]
+  prescriptions  Prescription[]
+  invoices       Invoice[]
+  reviews        Review[]
+
+  @@index([fullName])
+  @@index([phone])
+  @@index([email])
+  @@map("patients")
+}
+
+model Doctor {
+  id               String   @id @default(cuid()) @db.VarChar(36)
+  userId           String   @unique @db.VarChar(36)
+  licenseNumber    String   @unique @db.VarChar(60)
+  titlePrefix      String?  @db.VarChar(30)
+  fullName         String   @db.VarChar(150)
+  titleSuffix      String?  @db.VarChar(50)
+  specialization   String   @db.VarChar(120)
+  bio              String?  @db.Text
+  experienceYears  Int      @default(0)
+  education        String?  @db.VarChar(255)
+  consultationFee  Decimal  @default(150000) @db.Decimal(12, 2)
+  photoUrl         String?  @db.VarChar(500)
+  isActive         Boolean  @default(true)
+  isFeatured       Boolean  @default(false)
+  createdAt        DateTime @default(now())
+  updatedAt        DateTime @updatedAt
+
+  user           User            @relation(fields: [userId], references: [id], onDelete: Cascade)
+  schedules      Schedule[]
+  appointments   Appointment[]
+  queues         Queue[]
+  medicalRecords MedicalRecord[]
+  odontograms    Odontogram[]
+  prescriptions  Prescription[]
+
+  @@index([specialization])
+  @@index([isActive])
+  @@map("doctors")
+}
+
+model Service {
+  id              String   @id @default(cuid()) @db.VarChar(36)
+  code            String   @unique @db.VarChar(40)
+  slug            String   @unique @db.VarChar(140)
+  name            String   @db.VarChar(160)
+  category        String   @db.VarChar(80)
+  shortDesc       String   @db.VarChar(300)
+  description     String   @db.Text
+  price           Decimal  @db.Decimal(12, 2)
+  durationMinutes Int      @default(30)
+  iconName        String?  @db.VarChar(80)
+  isFeatured      Boolean  @default(false)
+  isActive        Boolean  @default(true)
+  createdAt       DateTime @default(now())
+  updatedAt       DateTime @updatedAt
+
+  appointments Appointment[]
+  treatments   Treatment[]
+
+  @@index([category])
+  @@index([isActive])
+  @@map("services")
+}
+
+model Schedule {
+  id              String   @id @default(cuid()) @db.VarChar(36)
+  doctorId        String   @db.VarChar(36)
+  dayOfWeek       Int // 0 = Minggu, 1 = Senin, ..., 6 = Sabtu
+  startTime       String   @db.VarChar(5) // HH:mm
+  endTime         String   @db.VarChar(5) // HH:mm
+  slotDurationMin Int      @default(30)
+  maxPatients     Int      @default(12)
+  isActive        Boolean  @default(true)
+  createdAt       DateTime @default(now())
+  updatedAt       DateTime @updatedAt
+
+  doctor Doctor @relation(fields: [doctorId], references: [id], onDelete: Cascade)
+
+  @@unique([doctorId, dayOfWeek, startTime])
+  @@index([doctorId, dayOfWeek])
+  @@map("schedules")
+}
+
+model ClinicHoliday {
+  id          String   @id @default(cuid()) @db.VarChar(36)
+  date        DateTime @unique
+  name        String   @db.VarChar(150)
+  description String?  @db.VarChar(255)
+  createdAt   DateTime @default(now())
+
+  @@map("clinic_holidays")
+}
+
+model ClinicSetting {
+  id                 String   @id @default(cuid()) @db.VarChar(36)
+  clinicName         String   @db.VarChar(150)
+  tagline            String   @db.VarChar(255)
+  address            String   @db.Text
+  phone              String   @db.VarChar(40)
+  whatsapp           String?  @db.VarChar(40)
+  email              String   @db.VarChar(180)
+  operatingHoursJson Json
+  mapEmbedUrl        String?  @db.Text
+  notificationConfig Json?
+  updatedAt          DateTime @updatedAt
+
+  @@map("clinic_settings")
+}
+
+// ============================================================================
+// 7-8. APPOINTMENTS & QUEUES
+// ============================================================================
+
+model Appointment {
+  id               String            @id @default(cuid()) @db.VarChar(36)
+  bookingCode      String            @unique @db.VarChar(30)
+  patientId        String            @db.VarChar(36)
+  doctorId         String            @db.VarChar(36)
+  serviceId        String            @db.VarChar(36)
+  appointmentDate  DateTime
+  startTime        String            @db.VarChar(5) // HH:mm
+  endTime          String            @db.VarChar(5) // HH:mm
+  slotKey          String?           @unique @db.VarChar(120)
+  status           AppointmentStatus @default(PENDING)
+  chiefComplaint   String?           @db.Text
+  notes            String?           @db.Text
+  verifiedAt       DateTime?
+  cancelledAt      DateTime?
+  cancelReason     String?           @db.VarChar(255)
+  createdAt        DateTime          @default(now())
+  updatedAt        DateTime          @updatedAt
+
+  patient       Patient        @relation(fields: [patientId], references: [id])
+  doctor        Doctor         @relation(fields: [doctorId], references: [id])
+  service       Service        @relation(fields: [serviceId], references: [id])
+  queue         Queue?
+  medicalRecord MedicalRecord?
+  invoice       Invoice?
+
+  @@index([patientId])
+  @@index([doctorId, appointmentDate])
+  @@index([status])
+  @@index([appointmentDate])
+  @@map("appointments")
+}
+
+model Queue {
+  id            String      @id @default(cuid()) @db.VarChar(36)
+  appointmentId String      @unique @db.VarChar(36)
+  patientId     String      @db.VarChar(36)
+  doctorId      String      @db.VarChar(36)
+  queueDate     DateTime
+  queueNumber   String      @db.VarChar(20)
+  sequence      Int
+  status        QueueStatus @default(WAITING)
+  checkedInAt   DateTime    @default(now())
+  calledAt      DateTime?
+  completedAt   DateTime?
+  createdAt     DateTime    @default(now())
+  updatedAt     DateTime    @updatedAt
+
+  appointment Appointment @relation(fields: [appointmentId], references: [id], onDelete: Cascade)
+  patient     Patient     @relation(fields: [patientId], references: [id])
+  doctor      Doctor      @relation(fields: [doctorId], references: [id])
+
+  @@unique([queueDate, queueNumber])
+  @@index([doctorId, queueDate])
+  @@index([status])
+  @@map("queues")
+}
+
+// ============================================================================
+// 9-13. MEDICAL RECORDS, DIAGNOSES, TREATMENTS, TEETH & ODONTOGRAMS
+// ============================================================================
+
+model MedicalRecord {
+  id                 String   @id @default(cuid()) @db.VarChar(36)
+  appointmentId      String   @unique @db.VarChar(36)
+  patientId          String   @db.VarChar(36)
+  doctorId           String   @db.VarChar(36)
+  visitDate          DateTime @default(now())
+  chiefComplaint     String   @db.Text
+  subjective         String?  @db.Text
+  objective          String?  @db.Text
+  vitalSignsJson     Json?
+  assessment         String?  @db.Text
+  plan               String?  @db.Text
+  clinicalNotes      String?  @db.Text
+  followUpDate       DateTime?
+  revisionNumber     Int      @default(1)
+  changeHistoryJson  Json?
+  createdAt          DateTime @default(now())
+  updatedAt          DateTime @updatedAt
+
+  appointment   Appointment    @relation(fields: [appointmentId], references: [id])
+  patient       Patient        @relation(fields: [patientId], references: [id])
+  doctor        Doctor         @relation(fields: [doctorId], references: [id])
+  diagnoses     Diagnosis[]
+  treatments    Treatment[]
+  odontograms   Odontogram[]
+  prescriptions Prescription[]
+
+  @@index([patientId, visitDate])
+  @@index([doctorId])
+  @@map("medical_records")
+}
+
+model Diagnosis {
+  id              String   @id @default(cuid()) @db.VarChar(36)
+  medicalRecordId String   @db.VarChar(36)
+  icdCode         String?  @db.VarChar(20)
+  name            String   @db.VarChar(200)
+  severity        String?  @db.VarChar(40)
+  notes           String?  @db.Text
+  createdAt       DateTime @default(now())
+
+  medicalRecord MedicalRecord @relation(fields: [medicalRecordId], references: [id], onDelete: Cascade)
+
+  @@index([medicalRecordId])
+  @@map("diagnoses")
+}
+
+model Treatment {
+  id              String   @id @default(cuid()) @db.VarChar(36)
+  medicalRecordId String   @db.VarChar(36)
+  serviceId       String?  @db.VarChar(36)
+  toothNumber     String?  @db.VarChar(10)
+  name            String   @db.VarChar(200)
+  fee             Decimal  @default(0) @db.Decimal(12, 2)
+  notes           String?  @db.Text
+  createdAt       DateTime @default(now())
+
+  medicalRecord MedicalRecord @relation(fields: [medicalRecordId], references: [id], onDelete: Cascade)
+  service       Service?      @relation(fields: [serviceId], references: [id], onDelete: SetNull)
+
+  @@index([medicalRecordId])
+  @@index([serviceId])
+  @@map("treatments")
+}
+
+model Tooth {
+  id        String    @id @default(cuid()) @db.VarChar(36)
+  fdiNumber String    @unique @db.VarChar(5) // 11-48 (permanen), 51-85 (susu)
+  quadrant  Int // 1-4 permanen, 5-8 susu
+  position  Int // 1-8 permanen, 1-5 susu
+  toothType ToothType
+  nameId    String    @db.VarChar(120)
+  arch      String    @db.VarChar(20) // ATAS / BAWAH
+  side      String    @db.VarChar(20) // KANAN / KIRI
+  createdAt DateTime  @default(now())
+
+  odontograms Odontogram[]
+
+  @@index([toothType, quadrant])
+  @@map("teeth")
+}
+
+model Odontogram {
+  id              String         @id @default(cuid()) @db.VarChar(36)
+  patientId       String         @db.VarChar(36)
+  doctorId        String         @db.VarChar(36)
+  medicalRecordId String?        @db.VarChar(36)
+  toothId         String         @db.VarChar(36)
+  condition       ToothCondition @default(SEHAT)
+  surfaces        String?        @db.VarChar(50) // Misal: "M,O,D,B,L"
+  diagnosis       String?        @db.VarChar(255)
+  treatment       String?        @db.VarChar(255)
+  notes           String?        @db.Text
+  recordedAt      DateTime       @default(now())
+  createdAt       DateTime       @default(now())
+  updatedAt       DateTime       @updatedAt
+
+  patient       Patient        @relation(fields: [patientId], references: [id])
+  doctor        Doctor         @relation(fields: [doctorId], references: [id])
+  medicalRecord MedicalRecord? @relation(fields: [medicalRecordId], references: [id], onDelete: SetNull)
+  tooth         Tooth          @relation(fields: [toothId], references: [id])
+
+  @@index([patientId, toothId])
+  @@index([medicalRecordId])
+  @@index([recordedAt])
+  @@map("odontograms")
+}
+
+// ============================================================================
+// 14-19. PRESCRIPTIONS, MEDICINES & INVENTORY LEDGER (FEFO)
+// ============================================================================
+
+model Medicine {
+  id             String   @id @default(cuid()) @db.VarChar(36)
+  code           String   @unique @db.VarChar(40)
+  name           String   @db.VarChar(180)
+  genericName    String?  @db.VarChar(180)
+  category       String   @db.VarChar(80)
+  unit           String   @db.VarChar(40) // Tablet, Kapsul, Botol, Tube, Box
+  unitPrice      Decimal  @db.Decimal(12, 2)
+  minimumStock   Int      @default(10)
+  description    String?  @db.Text
+  isActive       Boolean  @default(true)
+  createdAt      DateTime @default(now())
+  updatedAt      DateTime @updatedAt
+
+  inventory         Inventory?
+  batches           MedicineBatch[]
+  transactions      InventoryTransaction[]
+  prescriptionItems PrescriptionItem[]
+
+  @@index([category])
+  @@index([name])
+  @@map("medicines")
+}
+
+model Inventory {
+  id             String   @id @default(cuid()) @db.VarChar(36)
+  medicineId     String   @unique @db.VarChar(36)
+  availableStock Int      @default(0)
+  reservedStock  Int      @default(0)
+  lastRestockAt  DateTime?
+  createdAt      DateTime @default(now())
+  updatedAt      DateTime @updatedAt
+
+  medicine Medicine @relation(fields: [medicineId], references: [id], onDelete: Cascade)
+
+  @@map("inventory")
+}
+
+model MedicineBatch {
+  id            String   @id @default(cuid()) @db.VarChar(36)
+  medicineId    String   @db.VarChar(36)
+  batchNumber   String   @db.VarChar(60)
+  expiryDate    DateTime
+  initialQty    Int
+  remainingQty  Int
+  purchasePrice Decimal  @default(0) @db.Decimal(12, 2)
+  supplierName  String?  @db.VarChar(150)
+  receivedAt    DateTime @default(now())
+  createdAt     DateTime @default(now())
+  updatedAt     DateTime @updatedAt
+
+  medicine     Medicine               @relation(fields: [medicineId], references: [id], onDelete: Cascade)
+  transactions InventoryTransaction[]
+
+  @@unique([medicineId, batchNumber])
+  @@index([medicineId, expiryDate])
+  @@index([expiryDate])
+  @@map("medicine_batches")
+}
+
+model InventoryTransaction {
+  id            String                   @id @default(cuid()) @db.VarChar(36)
+  medicineId    String                   @db.VarChar(36)
+  batchId       String?                  @db.VarChar(36)
+  actorId       String?                  @db.VarChar(36)
+  type          InventoryTransactionType
+  quantity      Int // Positif untuk masuk, negatif untuk keluar
+  balanceBefore Int
+  balanceAfter  Int
+  referenceType String?                  @db.VarChar(50) // PRESCRIPTION, PURCHASE, ADJUSTMENT
+  referenceId   String?                  @db.VarChar(60)
+  notes         String?                  @db.VarChar(255)
+  createdAt     DateTime                 @default(now())
+
+  medicine Medicine       @relation(fields: [medicineId], references: [id])
+  batch    MedicineBatch? @relation(fields: [batchId], references: [id], onDelete: SetNull)
+  actor    User?          @relation("InventoryActor", fields: [actorId], references: [id], onDelete: SetNull)
+
+  @@index([medicineId, createdAt])
+  @@index([batchId])
+  @@index([type])
+  @@map("inventory_transactions")
+}
+
+model Prescription {
+  id                 String    @id @default(cuid()) @db.VarChar(36)
+  prescriptionNumber String    @unique @db.VarChar(40)
+  medicalRecordId    String    @db.VarChar(36)
+  patientId          String    @db.VarChar(36)
+  doctorId           String    @db.VarChar(36)
+  notes              String?   @db.Text
+  isDispensed        Boolean   @default(false)
+  dispensedAt        DateTime?
+  createdAt          DateTime  @default(now())
+  updatedAt          DateTime  @updatedAt
+
+  medicalRecord MedicalRecord      @relation(fields: [medicalRecordId], references: [id], onDelete: Cascade)
+  patient       Patient            @relation(fields: [patientId], references: [id])
+  doctor        Doctor             @relation(fields: [doctorId], references: [id])
+  items         PrescriptionItem[]
+
+  @@index([patientId])
+  @@index([medicalRecordId])
+  @@map("prescriptions")
+}
+
+model PrescriptionItem {
+  id             String   @id @default(cuid()) @db.VarChar(36)
+  prescriptionId String   @db.VarChar(36)
+  medicineId     String   @db.VarChar(36)
+  dosage         String   @db.VarChar(80)
+  frequency      String   @db.VarChar(80)
+  duration       String   @db.VarChar(80)
+  quantity       Int
+  instructions   String?  @db.VarChar(255)
+  unitPrice      Decimal  @default(0) @db.Decimal(12, 2)
+  createdAt      DateTime @default(now())
+
+  prescription Prescription @relation(fields: [prescriptionId], references: [id], onDelete: Cascade)
+  medicine     Medicine     @relation(fields: [medicineId], references: [id])
+
+  @@index([prescriptionId])
+  @@index([medicineId])
+  @@map("prescription_items")
+}
+
+// ============================================================================
+// 20-23. INVOICES, PAYMENTS, PAYMENT TRANSACTIONS & WEBHOOK EVENTS
+// ============================================================================
+
+model Invoice {
+  id            String        @id @default(cuid()) @db.VarChar(36)
+  invoiceNumber String        @unique @db.VarChar(40)
+  patientId     String        @db.VarChar(36)
+  appointmentId String?       @unique @db.VarChar(36)
+  itemsJson     Json
+  subtotal      Decimal       @db.Decimal(12, 2)
+  discount      Decimal       @default(0) @db.Decimal(12, 2)
+  tax           Decimal       @default(0) @db.Decimal(12, 2)
+  totalAmount   Decimal       @db.Decimal(12, 2)
+  paidAmount    Decimal       @default(0) @db.Decimal(12, 2)
+  status        InvoiceStatus @default(UNPAID)
+  dueDate       DateTime?
+  notes         String?       @db.Text
+  createdAt     DateTime      @default(now())
+  updatedAt     DateTime      @updatedAt
+
+  patient     Patient      @relation(fields: [patientId], references: [id])
+  appointment Appointment? @relation(fields: [appointmentId], references: [id], onDelete: SetNull)
+  payments    Payment[]
+
+  @@index([patientId])
+  @@index([status])
+  @@index([createdAt])
+  @@map("invoices")
+}
+
+model Payment {
+  id             String        @id @default(cuid()) @db.VarChar(36)
+  paymentNumber  String        @unique @db.VarChar(40)
+  invoiceId      String        @db.VarChar(36)
+  method         PaymentMethod
+  status         PaymentStatus @default(PENDING)
+  amount         Decimal       @db.Decimal(12, 2)
+  isManual       Boolean       @default(false)
+  isSimulated    Boolean       @default(false)
+  receiptNumber  String?       @unique @db.VarChar(40)
+  referenceNote  String?       @db.VarChar(255)
+  verifiedById   String?       @db.VarChar(36)
+  paidAt         DateTime?
+  createdAt      DateTime      @default(now())
+  updatedAt      DateTime      @updatedAt
+
+  invoice      Invoice              @relation(fields: [invoiceId], references: [id])
+  verifiedBy   User?                @relation("PaymentVerifier", fields: [verifiedById], references: [id], onDelete: SetNull)
+  transactions PaymentTransaction[]
+
+  @@index([invoiceId])
+  @@index([status])
+  @@index([createdAt])
+  @@map("payments")
+}
+
+model PaymentTransaction {
+  id                    String        @id @default(cuid()) @db.VarChar(36)
+  paymentId             String        @db.VarChar(36)
+  provider              String        @db.VarChar(60)
+  providerTransactionId String?       @unique @db.VarChar(120)
+  idempotencyKey        String        @unique @db.VarChar(120)
+  paymentUrl            String?       @db.Text
+  vaNumber              String?       @db.VarChar(80)
+  qrString              String?       @db.Text
+  amount                Decimal       @db.Decimal(12, 2)
+  status                PaymentStatus @default(PENDING)
+  rawResponseJson       Json?
+  expiresAt             DateTime?
+  createdAt             DateTime      @default(now())
+  updatedAt             DateTime      @updatedAt
+
+  payment Payment @relation(fields: [paymentId], references: [id], onDelete: Cascade)
+
+  @@index([paymentId])
+  @@index([provider])
+  @@map("payment_transactions")
+}
+
+model PaymentGatewayEvent {
+  id              String    @id @default(cuid()) @db.VarChar(36)
+  provider        String    @db.VarChar(60)
+  eventKey        String    @unique @db.VarChar(150)
+  eventType       String    @db.VarChar(80)
+  signatureValid  Boolean   @default(false)
+  payloadJson     Json
+  processed       Boolean   @default(false)
+  processedAt     DateTime?
+  errorMessage    String?   @db.Text
+  createdAt       DateTime  @default(now())
+
+  @@index([provider, processed])
+  @@map("payment_gateway_events")
+}
+
+// ============================================================================
+// 24-27. NOTIFICATIONS, ARTICLES, REVIEWS & AUDIT LOGS
+// ============================================================================
+
+model Notification {
+  id        String           @id @default(cuid()) @db.VarChar(36)
+  userId    String           @db.VarChar(36)
+  type      NotificationType @default(SYSTEM)
+  title     String           @db.VarChar(160)
+  message   String           @db.Text
+  linkUrl   String?          @db.VarChar(255)
+  isRead    Boolean          @default(false)
+  readAt    DateTime?
+  createdAt DateTime         @default(now())
+
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@index([userId, isRead])
+  @@index([createdAt])
+  @@map("notifications")
+}
+
+model Article {
+  id          String    @id @default(cuid()) @db.VarChar(36)
+  slug        String    @unique @db.VarChar(180)
+  title       String    @db.VarChar(220)
+  category    String    @db.VarChar(80)
+  excerpt     String    @db.VarChar(400)
+  content     String    @db.LongText
+  coverImage  String?   @db.VarChar(500)
+  authorId    String?   @db.VarChar(36)
+  isPublished Boolean   @default(true)
+  publishedAt DateTime?
+  createdAt   DateTime  @default(now())
+  updatedAt   DateTime  @updatedAt
+
+  author User? @relation("ArticleAuthor", fields: [authorId], references: [id], onDelete: SetNull)
+
+  @@index([category])
+  @@index([isPublished, publishedAt])
+  @@map("articles")
+}
+
+model Review {
+  id          String   @id @default(cuid()) @db.VarChar(36)
+  patientId   String?  @db.VarChar(36)
+  patientName String   @db.VarChar(120)
+  serviceName String?  @db.VarChar(120)
+  rating      Int
+  comment     String   @db.Text
+  isPublished Boolean  @default(true)
+  createdAt   DateTime @default(now())
+
+  patient Patient? @relation(fields: [patientId], references: [id], onDelete: SetNull)
+
+  @@index([isPublished, rating])
+  @@map("reviews")
+}
+
+model AuditLog {
+  id           String   @id @default(cuid()) @db.VarChar(36)
+  actorId      String?  @db.VarChar(36)
+  actorRole    String?  @db.VarChar(30)
+  action       String   @db.VarChar(100)
+  entityType   String   @db.VarChar(80)
+  entityId     String?  @db.VarChar(60)
+  beforeJson   Json?
+  afterJson    Json?
+  ipAddress    String?  @db.VarChar(64)
+  userAgent    String?  @db.VarChar(500)
+  createdAt    DateTime @default(now())
+
+  actor User? @relation(fields: [actorId], references: [id], onDelete: SetNull)
+
+  @@index([actorId])
+  @@index([entityType, entityId])
+  @@index([createdAt])
+  @@map("audit_logs")
+}
