@@ -76,21 +76,15 @@ export default defineEventHandler(async (event) => {
       }
     })
 
-    if (nextStatus === 'PAID' && invoice.medicalRecordId) {
-      const mr = await tx.medicalRecord.findUnique({
-        where: { id: invoice.medicalRecordId },
-        select: { appointmentId: true }
+    if (nextStatus === 'PAID' && invoice.appointmentId) {
+      await tx.appointment.update({
+        where: { id: invoice.appointmentId },
+        data: { status: 'COMPLETED' }
       })
-      if (mr?.appointmentId) {
-        await tx.appointment.update({
-          where: { id: mr.appointmentId },
-          data: { status: 'COMPLETED' }
-        })
-        await tx.queue.updateMany({
-          where: { appointmentId: mr.appointmentId },
-          data: { status: 'COMPLETED', completedAt: new Date() }
-        })
-      }
+      await tx.queue.updateMany({
+        where: { appointmentId: invoice.appointmentId },
+        data: { status: 'COMPLETED', completedAt: new Date() }
+      })
     }
 
     if (invoice.patient.userId) {

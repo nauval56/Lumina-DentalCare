@@ -20,11 +20,7 @@ export default defineEventHandler(async (event) => {
     include: {
       appointment: {
         include: {
-          medicalRecord: {
-            include: {
-              invoices: { select: { id: true, status: true } }
-            }
-          }
+          invoice: { select: { id: true, status: true } }
         }
       }
     }
@@ -41,9 +37,7 @@ export default defineEventHandler(async (event) => {
 
   const nextStatus = parsed.data.status
   if (nextStatus === 'COMPLETED') {
-    const hasPaidInvoice = Boolean(
-      existing.appointment?.medicalRecord?.invoices?.some((inv) => inv.status === 'PAID')
-    )
+    const hasPaidInvoice = existing.appointment?.invoice?.status === 'PAID'
     if (!hasPaidInvoice) {
       throw createError({
         statusCode: 400,

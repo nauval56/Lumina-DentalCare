@@ -1,8 +1,9 @@
-import { getQuery } from 'h3'
+import { getQuery, setHeader } from 'h3'
 import { prisma } from '../../utils/prisma'
 import { requireAuth } from '../../utils/session'
 
 export default defineEventHandler(async (event) => {
+  setHeader(event, 'Cache-Control', 'no-store')
   const user = await requireAuth(event)
   const query = getQuery(event)
   const status = String(query.status || '').trim()
@@ -27,7 +28,9 @@ export default defineEventHandler(async (event) => {
   }
 
   if (/^\d{4}-\d{2}-\d{2}$/.test(dateStr)) {
-    where.appointmentDate = new Date(`${dateStr}T00:00:00.000Z`)
+    const dayStart = new Date(`${dateStr}T00:00:00.000Z`)
+    const dayEnd = new Date(`${dateStr}T23:59:59.999Z`)
+    where.appointmentDate = { gte: dayStart, lte: dayEnd }
   }
 
   const appointments = await prisma.appointment.findMany({

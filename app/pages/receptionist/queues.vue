@@ -1,23 +1,35 @@
 <script setup lang="ts">
+import { formatDateId } from '~/utils/format'
+
 definePageMeta({ layout: 'portal' })
 
-const dateFilter = ref(new Date().toISOString().slice(0, 10))
+const wibToday = new Date(Date.now() + 7 * 60 * 60 * 1000).toISOString().slice(0, 10)
+const dateFilter = ref(wibToday)
+const showAllDates = ref(true)
 const toast = useClinicToast()
+const requestHeaders = import.meta.server ? useRequestHeaders(['cookie']) : undefined
 
 const [
   { data: queueData, refresh: refreshQueue },
   { data: apptData, refresh: refreshAppt }
 ] = await Promise.all([
   useFetch('/api/queues', {
-    query: computed(() => ({ date: dateFilter.value }))
+    headers: requestHeaders,
+    query: computed(() =>
+      showAllDates.value ? { all: '1' } : { date: dateFilter.value }
+    )
   }),
-  useFetch('/api/appointments')
+  useFetch('/api/appointments', { headers: requestHeaders })
 ])
+
+onMounted(async () => {
+  await Promise.all([refreshQueue(), refreshAppt()])
+})
 
 const readyForCheckin = computed(() =>
   (apptData.value?.items || []).filter(
     (a: { status: string; queue?: unknown }) =>
-      ['CONFIRMED', 'PENDING'].includes(a.status) && !a.queue
+      ['CONFIRMED', 'PENDING', 'CHECKED_IN'].includes(a.status) && !a.queue
   )
 )
 
@@ -66,11 +78,24 @@ async function updateStatus(id: string, status: string) {
           Manajemen Antrean Klinik
         </h1>
       </div>
-      <div>
+      <div class="flex flex-wrap items-center gap-2">
+        <button
+          type="button"
+          class="px-3.5 py-2.5 min-h-11 rounded-md border text-[12px] font-semibold transition-colors"
+          :class="
+            showAllDates
+              ? 'bg-[#137A7F] border-[#137A7F] text-white'
+              : 'bg-white border-[#D8E6E8] text-[#0B253A] hover:bg-[#DFF1F2]'
+          "
+          @click="showAllDates = !showAllDates"
+        >
+          {{ showAllDates ? 'Semua Tanggal Aktif' : 'Filter per Tanggal' }}
+        </button>
         <input
           v-model="dateFilter"
           type="date"
-          class="px-4 py-2.5 min-h-11 rounded-md border border-[#D8E6E8] text-[13px] bg-white text-[#0B253A]"
+          :disabled="showAllDates"
+          class="px-4 py-2.5 min-h-11 rounded-md border border-[#D8E6E8] text-[13px] bg-white text-[#0B253A] disabled:opacity-50"
         >
       </div>
     </div>
@@ -91,7 +116,7 @@ async function updateStatus(id: string, status: string) {
               <span class="font-mono text-xs font-bold text-[#137A7F]">{{ a.bookingCode }}</span>
               <p class="font-semibold text-sm text-[#0B253A]">{{ a.patient?.fullName }}</p>
               <p class="text-xs text-[#475569]">
-                {{ a.startTime }} WIB · {{ a.doctor?.titlePrefix }} {{ a.doctor?.fullName }}
+                {{ formatDateId(a.appointmentDate) }} · {{ a.startTime }} WIB · {{ a.doctor?.titlePrefix }} {{ a.doctor?.fullName }}
               </p>
             </div>
             <button
@@ -111,7 +136,7 @@ async function updateStatus(id: string, status: string) {
       <!-- Board Nomor Antrean Aktif -->
       <div class="lg:col-span-7 lumina-card p-6 space-y-4">
         <h2 class="font-heading font-bold text-base text-[#0B253A]">
-          Daftar Nomor Antrean ({{ dateFilter }})
+          Daftar Nomor Antrean ({{ showAllDates ? 'Semua Tanggal' : dateFilter }})
         </h2>
 
         <div v-if="(queueData?.items || []).length" class="space-y-3">
@@ -153,7 +178,7 @@ async function updateStatus(id: string, status: string) {
               <button
                 v-if="
                   q.status === 'IN_PROGRESS' &&
-                  q.appointment?.medicalRecord?.invoices?.some((inv: { status: string }) => inv.status === 'PAID')
+                  q.appointment?.invoice?.status === 'PAID'
                 "
                 type="button"
                 class="px-3.5 py-2 min-h-11 rounded-md bg-emerald-600 text-white text-xs font-semibold"

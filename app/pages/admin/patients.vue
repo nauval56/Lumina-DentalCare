@@ -28,8 +28,13 @@ const form = reactive({
   phone: '',
   gender: 'LAKI_LAKI' as 'LAKI_LAKI' | 'PEREMPUAN',
   dateOfBirth: '',
+  bloodType: '',
   address: '',
-  allergies: ''
+  allergies: '',
+  emergencyContact: '',
+  emergencyPhone: '',
+  createPortalAccount: true,
+  password: ''
 })
 
 function openCreateModal() {
@@ -40,8 +45,13 @@ function openCreateModal() {
   form.phone = ''
   form.gender = 'LAKI_LAKI'
   form.dateOfBirth = ''
+  form.bloodType = ''
   form.address = ''
   form.allergies = ''
+  form.emergencyContact = ''
+  form.emergencyPhone = ''
+  form.createPortalAccount = true
+  form.password = ''
   showModal.value = true
 }
 
@@ -53,8 +63,13 @@ function openEditModal(p: Record<string, unknown>) {
   form.phone = String(p.phone || '')
   form.gender = (p.gender === 'PEREMPUAN' ? 'PEREMPUAN' : 'LAKI_LAKI')
   form.dateOfBirth = p.dateOfBirth ? String(p.dateOfBirth).slice(0, 10) : ''
+  form.bloodType = String(p.bloodType || '')
   form.address = String(p.address || '')
   form.allergies = String(p.allergies || '')
+  form.emergencyContact = String(p.emergencyContact || '')
+  form.emergencyPhone = String(p.emergencyPhone || '')
+  form.createPortalAccount = false
+  form.password = ''
   showModal.value = true
 }
 
@@ -235,7 +250,7 @@ function exportPatientsCsv() {
       v-if="showModal"
       class="fixed inset-0 z-50 flex items-center justify-center bg-[#0B253A]/50 backdrop-blur-xs p-4"
     >
-      <form class="lumina-card max-w-lg w-full p-6 space-y-4" @submit.prevent="savePatient">
+      <form class="lumina-card max-w-lg w-full max-h-[90vh] overflow-y-auto p-6 space-y-4" @submit.prevent="savePatient">
         <div class="flex items-center justify-between">
           <h3 class="font-heading font-bold text-lg text-[#0B253A]">
             {{ editingId ? 'Edit Data Pasien' : 'Tambah Pasien Baru' }}
@@ -256,6 +271,7 @@ function exportPatientsCsv() {
               v-model="form.fullName"
               type="text"
               required
+              minlength="3"
               placeholder="Nama Lengkap"
               class="w-full px-3.5 py-2 rounded-md border border-[#D8E6E8] text-sm"
             >
@@ -281,10 +297,11 @@ function exportPatientsCsv() {
             >
           </div>
           <div>
-            <label class="block text-xs font-semibold text-slate-700 mb-1">Email</label>
+            <label class="block text-xs font-semibold text-slate-700 mb-1">Email {{ !editingId ? '*' : '' }}</label>
             <input
               v-model="form.email"
               type="email"
+              :required="!editingId"
               placeholder="nama@email.id"
               class="w-full px-3.5 py-2 rounded-md border border-[#D8E6E8] text-sm"
             >
@@ -325,6 +342,23 @@ function exportPatientsCsv() {
             v-model="form.allergies"
             type="text"
             placeholder="Misal: Alergi Penisilin / Tidak ada"
+            class="w-full px-3.5 py-2 rounded-md border border-[#D8E6E8] text-sm"
+          >
+        </div>
+
+        <div>
+          <label class="block text-xs font-semibold text-slate-700 mb-1">
+            Kata Sandi {{ !editingId ? '*' : '' }} (Min. 8 karakter kombinasi huruf &amp; angka)
+          </label>
+          <input
+            v-model="form.password"
+            type="password"
+            :required="!editingId"
+            minlength="8"
+            pattern="(?=.*[A-Za-z])(?=.*\d).{8,}"
+            title="Kata sandi minimal 8 karakter dan wajib mengandung kombinasi huruf serta angka"
+            autocomplete="new-password"
+            placeholder="Minimal 8 karakter (huruf & angka)"
             class="w-full px-3.5 py-2 rounded-md border border-[#D8E6E8] text-sm"
           >
         </div>

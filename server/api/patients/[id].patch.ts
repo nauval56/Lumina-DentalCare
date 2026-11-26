@@ -3,6 +3,7 @@ import { getRouterParam, readBody, createError } from 'h3'
 import { prisma } from '../../utils/prisma'
 import { requireAuth } from '../../utils/session'
 import { writeAuditLog } from '../../utils/audit'
+import { hashPassword } from '../../utils/crypto'
 
 const updatePatientSchema = z.object({
   fullName: z.string().trim().min(3).max(150).optional(),
@@ -16,7 +17,13 @@ const updatePatientSchema = z.object({
   allergies: z.string().trim().max(500).optional().or(z.literal('')),
   medicalNotes: z.string().trim().max(500).optional().or(z.literal('')),
   emergencyContact: z.string().trim().max(150).optional().or(z.literal('')),
-  emergencyPhone: z.string().trim().max(30).optional().or(z.literal(''))
+  emergencyPhone: z.string().trim().max(30).optional().or(z.literal('')),
+  password: z
+    .string()
+    .min(8, 'Kata sandi minimal 8 karakter')
+    .regex(/^(?=.*[A-Za-z])(?=.*\d).{8,}$/, 'Kata sandi wajib kombinasi huruf dan angka')
+    .optional()
+    .or(z.literal(''))
 })
 
 export default defineEventHandler(async (event) => {
@@ -86,14 +93,38 @@ export default defineEventHandler(async (event) => {
     }
   })
 
-  if (existing.userId && (d.fullName || d.phone)) {
+  const passwordHash = d.password ? await hashPassword(d.password) : undefined
+
+  if (existing.userId && (d.fullName || d.phone || d.email || passwordHash)) {
     await prisma.user.update({
       where: { id: existing.userId },
       data: {
         fullName: d.fullName ?? undefined,
-        phone: d.phone ?? undefined
+        phone: d.phone ?? undefined,
+        email: d.email ? d.email.toLowerCase() : undefined,
+        passwordHash
       }
     }).catch(() => {})
+  } else if (!existing.userId && updated.email && passwordHash) {
+    const patientRole = await prisma.role.findUnique({ where: { code: 'PATIENT' } })
+    const dupUser = await prisma.user.findUnique({ where: { email: updated.email } })
+    if (patientRole && !dupUser) {
+      const createdUser = await prisma.user.create({
+        data: {
+          email: updated.email,
+          passwordHash,
+          fullName: updated.fullName,
+          phone: updated.phone,
+          roleId: patientRole.id,
+          isActive: true,
+          emailVerifiedAt: new Date()
+        }
+      })
+      await prisma.patient.update({
+        where: { id: updated.id },
+        data: { userId: createdUser.id }
+      })
+    }
   }
 
   await writeAuditLog(event, {

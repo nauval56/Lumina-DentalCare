@@ -1,8 +1,9 @@
-import { getQuery } from 'h3'
+import { getQuery, setHeader } from 'h3'
 import { prisma } from '../../utils/prisma'
 import { requireRole } from '../../utils/session'
 
 export default defineEventHandler(async (event) => {
+  setHeader(event, 'Cache-Control', 'no-store')
   const user = await requireRole(event, ['PATIENT', 'RECEPTIONIST', 'ADMIN'])
   const query = getQuery(event)
   const status = String(query.status || '').trim()

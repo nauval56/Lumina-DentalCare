@@ -79,8 +79,18 @@ function addDiagnosis() {
   form.diagnoses.push({ icdCode: '', name: '', severity: 'Ringan', notes: '' })
 }
 
+function removeDiagnosis(idx: number) {
+  if (idx <= 0 || form.diagnoses.length <= 1) return
+  form.diagnoses.splice(idx, 1)
+}
+
 function addTreatment() {
   form.treatments.push({ serviceId: '', toothNumber: '', name: '', fee: 0, notes: '' })
+}
+
+function removeTreatment(idx: number) {
+  if (idx <= 0 || form.treatments.length <= 1) return
+  form.treatments.splice(idx, 1)
 }
 
 function addPrescriptionItem() {
@@ -330,27 +340,37 @@ async function saveRevision() {
         <div
           v-for="(diag, idx) in form.diagnoses"
           :key="idx"
-          class="p-3.5 rounded-md bg-[#F4F9F9] border border-[#D8E6E8] grid grid-cols-1 sm:grid-cols-4 gap-3 items-center"
+          class="p-3.5 rounded-md bg-[#F4F9F9] border border-[#D8E6E8] grid grid-cols-1 sm:grid-cols-12 gap-3 items-center"
         >
           <input
             v-model="diag.icdCode"
             type="text"
             placeholder="Kode ICD (Mis: K02.1)"
-            class="px-3.5 py-2 min-h-11 rounded-md border border-[#D8E6E8] bg-white text-xs text-[#0B253A]"
+            class="sm:col-span-2 px-3.5 py-2 min-h-11 rounded-md border border-[#D8E6E8] bg-white text-xs text-[#0B253A]"
           >
           <input
             v-model="diag.name"
             type="text"
             required
             placeholder="Nama Diagnosis *"
-            class="sm:col-span-2 px-3.5 py-2 min-h-11 rounded-md border border-[#D8E6E8] bg-white text-xs text-[#0B253A]"
+            class="sm:col-span-5 px-3.5 py-2 min-h-11 rounded-md border border-[#D8E6E8] bg-white text-xs text-[#0B253A]"
           >
           <input
             v-model="diag.severity"
             type="text"
             placeholder="Keparahan (Ringan/Sedang)"
-            class="px-3.5 py-2 min-h-11 rounded-md border border-[#D8E6E8] bg-white text-xs text-[#0B253A]"
+            class="sm:col-span-3 px-3.5 py-2 min-h-11 rounded-md border border-[#D8E6E8] bg-white text-xs text-[#0B253A]"
           >
+          <div class="sm:col-span-2 flex justify-end">
+            <button
+              v-if="idx > 0"
+              type="button"
+              class="w-full sm:w-auto px-3 py-2 min-h-11 rounded-md bg-rose-50 hover:bg-rose-100 text-[#BE123C] border border-rose-200 text-xs font-semibold transition-colors"
+              @click="removeDiagnosis(idx)"
+            >
+              Hapus
+            </button>
+          </div>
         </div>
       </div>
 
@@ -380,7 +400,7 @@ async function saveRevision() {
         >
           <select
             :value="tr.serviceId"
-            class="sm:col-span-4 px-3 py-2 min-h-11 rounded-md border border-[#D8E6E8] text-xs bg-white text-[#0B253A]"
+            class="sm:col-span-3 px-3 py-2 min-h-11 rounded-md border border-[#D8E6E8] text-xs bg-white text-[#0B253A]"
             @change="applyServicePreset(idx, ($event.target as HTMLSelectElement).value)"
           >
             <option value="">-- Pilih Katalog Layanan (Opsional) --</option>
@@ -399,7 +419,7 @@ async function saveRevision() {
             type="text"
             required
             placeholder="Nama Tindakan *"
-            class="sm:col-span-4 px-3 py-2 min-h-11 rounded-md border border-[#D8E6E8] text-xs bg-white text-[#0B253A]"
+            class="sm:col-span-3 px-3 py-2 min-h-11 rounded-md border border-[#D8E6E8] text-xs bg-white text-[#0B253A]"
           >
           <input
             v-model.number="tr.fee"
@@ -409,6 +429,16 @@ async function saveRevision() {
             placeholder="Tarif (IDR)"
             class="sm:col-span-2 px-3 py-2 min-h-11 rounded-md border border-[#D8E6E8] text-xs bg-white font-semibold text-[#137A7F]"
           >
+          <div class="sm:col-span-2 flex justify-end">
+            <button
+              v-if="idx > 0"
+              type="button"
+              class="w-full sm:w-auto px-3 py-2 min-h-11 rounded-md bg-rose-50 hover:bg-rose-100 text-[#BE123C] border border-rose-200 text-xs font-semibold transition-colors"
+              @click="removeTreatment(idx)"
+            >
+              Hapus
+            </button>
+          </div>
         </div>
       </div>
 

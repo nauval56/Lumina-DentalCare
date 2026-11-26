@@ -24,7 +24,9 @@ const form = reactive({
   address: '',
   allergies: '',
   emergencyContact: '',
-  emergencyPhone: ''
+  emergencyPhone: '',
+  createPortalAccount: true,
+  password: ''
 })
 
 function openCreate() {
@@ -40,6 +42,8 @@ function openCreate() {
   form.allergies = ''
   form.emergencyContact = ''
   form.emergencyPhone = ''
+  form.createPortalAccount = true
+  form.password = ''
   showForm.value = true
 }
 
@@ -56,6 +60,8 @@ function openEdit(p: Record<string, unknown>) {
   form.allergies = String(p.allergies || '')
   form.emergencyContact = String(p.emergencyContact || '')
   form.emergencyPhone = String(p.emergencyPhone || '')
+  form.createPortalAccount = false
+  form.password = ''
   showForm.value = true
 }
 
@@ -120,94 +126,165 @@ async function savePatient() {
       class="lumina-card p-6 space-y-4 border-[#D8E6E8]"
       @submit.prevent="savePatient"
     >
-      <div class="flex items-center justify-between pb-2 border-b border-[#D8E6E8]">
-        <h2 class="font-heading font-bold text-base text-[#0B253A]">
-          {{ editingId ? 'Edit Data Pasien' : 'Registrasi Pasien Baru (Pencegahan Duplikasi Aktif)' }}
-        </h2>
-        <button type="button" class="text-xs text-[#475569]" @click="showForm = false">Tutup</button>
+      <div class="flex items-center justify-between pb-3 border-b border-[#D8E6E8]">
+        <div>
+          <span class="text-[11px] font-bold uppercase text-[#137A7F]">
+            {{ editingId ? 'PEMBARUAN DATA PASIEN' : 'REGISTRASI PASIEN BARU & SINKRONISASI PORTAL' }}
+          </span>
+          <h2 class="font-heading font-bold text-base text-[#0B253A]">
+            {{ editingId ? 'Edit Data Pasien' : 'Registrasi Pasien Baru (Setara Pendaftaran Publik + Nomor RM)' }}
+          </h2>
+        </div>
+        <button
+          type="button"
+          class="px-3 py-1.5 min-h-11 rounded-md border border-[#D8E6E8] text-xs font-semibold text-[#475569] hover:bg-[#EAF5F6]"
+          @click="showForm = false"
+        >
+          Tutup
+        </button>
       </div>
 
-      <div class="grid grid-cols-1 sm:grid-cols-3 gap-4">
+      <div class="grid grid-cols-1 sm:grid-cols-2 gap-4">
         <div>
-          <label class="block text-xs font-semibold text-slate-700 mb-1">Nama Lengkap *</label>
+          <label class="block text-xs font-semibold text-[#0B253A] mb-1">Nama Lengkap KTP *</label>
           <input
             v-model="form.fullName"
             type="text"
             required
-            class="w-full px-3.5 py-2 rounded-md border border-[#D8E6E8] text-sm"
+            minlength="3"
+            placeholder="Sesuai KTP"
+            class="w-full px-3.5 py-2.5 min-h-11 rounded-md border border-[#D8E6E8] text-sm"
           >
         </div>
         <div>
-          <label class="block text-xs font-semibold text-slate-700 mb-1">NIK (16 Digit)</label>
+          <label class="block text-xs font-semibold text-[#0B253A] mb-1">NIK (16 Digit, Opsional)</label>
           <input
             v-model="form.nik"
             type="text"
             maxlength="16"
-            class="w-full px-3.5 py-2 rounded-md border border-[#D8E6E8] text-sm"
-          >
-        </div>
-        <div>
-          <label class="block text-xs font-semibold text-slate-700 mb-1">Nomor Telepon *</label>
-          <input
-            v-model="form.phone"
-            type="text"
-            required
-            class="w-full px-3.5 py-2 rounded-md border border-[#D8E6E8] text-sm"
+            placeholder="617101xxxxxxxxxx"
+            class="w-full px-3.5 py-2.5 min-h-11 rounded-md border border-[#D8E6E8] text-sm"
           >
         </div>
       </div>
 
-      <div class="grid grid-cols-1 sm:grid-cols-4 gap-4">
+      <div class="grid grid-cols-1 sm:grid-cols-2 gap-4">
         <div>
-          <label class="block text-xs font-semibold text-slate-700 mb-1">Email</label>
+          <label class="block text-xs font-semibold text-[#0B253A] mb-1">
+            Alamat Email {{ !editingId && form.createPortalAccount ? '*' : '' }}
+          </label>
           <input
             v-model="form.email"
             type="email"
-            class="w-full px-3.5 py-2 rounded-md border border-[#D8E6E8] text-sm"
+            :required="!editingId && form.createPortalAccount"
+            placeholder="nama@email.id"
+            class="w-full px-3.5 py-2.5 min-h-11 rounded-md border border-[#D8E6E8] text-sm"
           >
         </div>
         <div>
-          <label class="block text-xs font-semibold text-slate-700 mb-1">Jenis Kelamin</label>
+          <label class="block text-xs font-semibold text-[#0B253A] mb-1">Telepon / WhatsApp *</label>
+          <input
+            v-model="form.phone"
+            type="tel"
+            required
+            placeholder="0812xxxxxxxx"
+            class="w-full px-3.5 py-2.5 min-h-11 rounded-md border border-[#D8E6E8] text-sm"
+          >
+        </div>
+      </div>
+
+      <div class="grid grid-cols-1 sm:grid-cols-3 gap-4">
+        <div>
+          <label class="block text-xs font-semibold text-[#0B253A] mb-1">Jenis Kelamin</label>
           <select
             v-model="form.gender"
-            class="w-full px-3.5 py-2 rounded-md border border-[#D8E6E8] text-sm bg-white"
+            class="w-full px-3.5 py-2.5 min-h-11 rounded-md border border-[#D8E6E8] text-sm bg-white"
           >
             <option value="LAKI_LAKI">Laki-laki</option>
             <option value="PEREMPUAN">Perempuan</option>
           </select>
         </div>
         <div>
-          <label class="block text-xs font-semibold text-slate-700 mb-1">Tanggal Lahir</label>
+          <label class="block text-xs font-semibold text-[#0B253A] mb-1">Tanggal Lahir</label>
           <input
             v-model="form.dateOfBirth"
             type="date"
-            class="w-full px-3.5 py-2 rounded-md border border-[#D8E6E8] text-sm"
+            class="w-full px-3.5 py-2.5 min-h-11 rounded-md border border-[#D8E6E8] text-sm"
           >
         </div>
         <div>
-          <label class="block text-xs font-semibold text-slate-700 mb-1">Alergi Obat</label>
+          <label class="block text-xs font-semibold text-[#0B253A] mb-1">Golongan Darah</label>
           <input
-            v-model="form.allergies"
+            v-model="form.bloodType"
             type="text"
-            placeholder="Misal: Penisilin"
-            class="w-full px-3.5 py-2 rounded-md border border-[#D8E6E8] text-sm"
+            maxlength="5"
+            placeholder="A / B / AB / O"
+            class="w-full px-3.5 py-2.5 min-h-11 rounded-md border border-[#D8E6E8] text-sm"
           >
         </div>
       </div>
 
       <div>
-        <label class="block text-xs font-semibold text-slate-700 mb-1">Alamat Lengkap</label>
+        <label class="block text-xs font-semibold text-[#0B253A] mb-1">Alamat Domisili</label>
         <input
           v-model="form.address"
           type="text"
-          class="w-full px-3.5 py-2 rounded-md border border-[#D8E6E8] text-sm"
+          placeholder="Alamat lengkap di Pontianak / sekitarnya"
+          class="w-full px-3.5 py-2.5 min-h-11 rounded-md border border-[#D8E6E8] text-sm"
+        >
+      </div>
+
+      <div class="grid grid-cols-1 sm:grid-cols-3 gap-4">
+        <div>
+          <label class="block text-xs font-semibold text-[#0B253A] mb-1">Riwayat Alergi Obat / Makanan</label>
+          <input
+            v-model="form.allergies"
+            type="text"
+            placeholder="Misal: Penisilin / Tidak ada"
+            class="w-full px-3.5 py-2.5 min-h-11 rounded-md border border-[#D8E6E8] text-sm"
+          >
+        </div>
+        <div>
+          <label class="block text-xs font-semibold text-[#0B253A] mb-1">Nama Kontak Darurat</label>
+          <input
+            v-model="form.emergencyContact"
+            type="text"
+            placeholder="Keluarga terdekat"
+            class="w-full px-3.5 py-2.5 min-h-11 rounded-md border border-[#D8E6E8] text-sm"
+          >
+        </div>
+        <div>
+          <label class="block text-xs font-semibold text-[#0B253A] mb-1">No. HP Kontak Darurat</label>
+          <input
+            v-model="form.emergencyPhone"
+            type="tel"
+            placeholder="0812xxxxxxxx"
+            class="w-full px-3.5 py-2.5 min-h-11 rounded-md border border-[#D8E6E8] text-sm"
+          >
+        </div>
+      </div>
+
+      <div>
+        <label class="block text-xs font-semibold text-[#0B253A] mb-1">
+          Kata Sandi {{ !editingId ? '*' : '' }} (Min. 8 karakter kombinasi huruf &amp; angka)
+        </label>
+        <input
+          v-model="form.password"
+          type="password"
+          :required="!editingId"
+          minlength="8"
+          pattern="(?=.*[A-Za-z])(?=.*\d).{8,}"
+          title="Kata sandi minimal 8 karakter dan wajib mengandung kombinasi huruf serta angka"
+          autocomplete="new-password"
+          placeholder="Minimal 8 karakter (huruf & angka)"
+          class="w-full px-3.5 py-2.5 min-h-11 rounded-md border border-[#D8E6E8] bg-white text-sm"
         >
       </div>
 
       <div class="flex justify-end gap-2">
         <button
           type="button"
-          class="px-4 py-2 rounded-md border border-[#D8E6E8] text-xs font-semibold"
+          class="px-4 py-2 min-h-11 rounded-md border border-[#D8E6E8] text-xs font-semibold"
           @click="showForm = false"
         >
           Batal
@@ -215,9 +292,9 @@ async function savePatient() {
         <button
           type="submit"
           :disabled="saving"
-          class="px-5 py-2 rounded-md bg-[#137A7F] text-white text-xs font-semibold"
+          class="px-5 py-2 min-h-11 rounded-md bg-[#137A7F] hover:bg-[#0E5F63] text-white text-xs font-semibold"
         >
-          {{ saving ? 'Menyimpan...' : 'Simpan Data Pasien' }}
+          {{ saving ? 'Menyimpan...' : editingId ? 'Simpan Perubahan Data' : 'Daftarkan Pasien & Sinkronkan' }}
         </button>
       </div>
     </form>
