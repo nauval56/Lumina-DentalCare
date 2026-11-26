@@ -1,4 +1,4 @@
-import { getQuery, createError } from 'h3'
+import { getQuery, createError, setHeader } from 'h3'
 import { prisma } from '../../utils/prisma'
 import {
   timeToMinutes,
@@ -42,7 +42,9 @@ export default defineEventHandler(async (event) => {
     }
   }
 
+  setHeader(event, 'Cache-Control', 'no-store')
   const normalizedDate = new Date(`${dateStr}T00:00:00.000Z`)
+  const dayEnd = new Date(`${dateStr}T23:59:59.999Z`)
   const dayOfWeek = normalizedDate.getUTCDay()
 
   const [doctor, service, holiday, clinicSetting, allHolidays, existingAppointments] = await Promise.all([
@@ -62,8 +64,8 @@ export default defineEventHandler(async (event) => {
     prisma.appointment.findMany({
       where: {
         doctorId,
-        appointmentDate: normalizedDate,
-        status: { in: ['PENDING', 'CONFIRMED', 'CHECKED_IN', 'IN_TREATMENT'] }
+        appointmentDate: { gte: normalizedDate, lte: dayEnd },
+        status: { in: ['PENDING', 'CONFIRMED', 'CHECKED_IN', 'IN_TREATMENT', 'COMPLETED'] }
       },
       select: { startTime: true, endTime: true, status: true }
     })
@@ -74,7 +76,7 @@ export default defineEventHandler(async (event) => {
   for (const h of allHolidays) {
     dbHolidayMap[h.date.toISOString().slice(0, 10)] = h.name
   }
-  const clinicDayStatus = evaluateClinicDateStatus(dateStr, scheduleConfig, dbHolidayMap)
+  const clinicDayStatus = evaluateClinicDateStatus(dateStr, scheduleConfig, dbHolidayMap, doctorId)
 
   if (!doctor || !doctor.isActive) {
     return {
@@ -94,7 +96,7 @@ export default defineEventHandler(async (event) => {
     }
   }
 
-  if (holiday) {
+  if (holiday && clinicDayStatus.status !== 'SPECIAL_PRACTICE') {
     return {
       available: false,
       clinicDayStatus,
@@ -103,7 +105,20 @@ export default defineEventHandler(async (event) => {
     }
   }
 
-  if (doctor.schedules.length === 0) {
+  const effectiveSchedules =
+    doctor.schedules.length > 0
+      ? doctor.schedules
+      : clinicDayStatus.status === 'SPECIAL_PRACTICE' && clinicDayStatus.openTime && clinicDayStatus.closeTime
+        ? [
+            {
+              startTime: clinicDayStatus.openTime,
+              endTime: clinicDayStatus.closeTime,
+              slotDurationMin: scheduleConfig.slotIntervalMinutes
+            }
+          ]
+        : []
+
+  if (effectiveSchedules.length === 0) {
     return {
       available: false,
       clinicDayStatus,
@@ -126,7 +141,7 @@ export default defineEventHandler(async (event) => {
     reason?: string
   }> = []
 
-  for (const sch of doctor.schedules) {
+  for (const sch of effectiveSchedules) {
     const startMin = timeToMinutes(sch.startTime)
     const endMin = timeToMinutes(sch.endTime)
     const step = scheduleConfig.slotIntervalMinutes || sch.slotDurationMin || 30

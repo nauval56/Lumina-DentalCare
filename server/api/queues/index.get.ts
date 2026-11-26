@@ -30,7 +30,15 @@ export default defineEventHandler(async (event) => {
       },
       appointment: {
         include: {
-          service: { select: { id: true, name: true, durationMinutes: true } }
+          service: { select: { id: true, name: true, durationMinutes: true } },
+          medicalRecord: {
+            select: {
+              id: true,
+              invoices: {
+                select: { id: true, invoiceNumber: true, status: true }
+              }
+            }
+          }
         }
       }
     },

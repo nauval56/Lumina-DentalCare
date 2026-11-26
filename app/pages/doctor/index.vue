@@ -4,8 +4,12 @@ import {
   formatDateId,
   formatDayAndDateId,
   getDateStringForDayOfWeek,
-  formatScheduleDayAndDate
+  getDayNameId
 } from '~/utils/format'
+import {
+  evaluateClinicDateStatus,
+  normalizeClinicScheduleConfig
+} from '~/utils/clinicScheduleRules'
 
 definePageMeta({ layout: 'portal' })
 
@@ -15,14 +19,95 @@ const toast = useClinicToast()
 const [
   { data: apptData, refresh: refreshAppt },
   { data: queueData, refresh: refreshQueue },
-  { data: schedulesData, refresh: refreshSchedules }
+  { data: schedulesData, refresh: refreshSchedules },
+  { data: clinicScheduleRes, refresh: refreshClinicSchedule },
+  { data: leavesData, refresh: refreshLeaves }
 ] = await Promise.all([
   useFetch('/api/appointments'),
   useFetch('/api/queues'),
   useFetch('/api/schedules', {
     query: computed(() => (auth.user?.doctorId ? { doctorId: auth.user.doctorId } : {}))
-  })
+  }),
+  useFetch('/api/clinic-schedule'),
+  useFetch('/api/doctor-leaves')
 ])
+
+const showLeaveRequestForm = ref(false)
+const submittingLeave = ref(false)
+const leaveForm = reactive({
+  leaveDate: new Date(Date.now() + 86400000).toISOString().slice(0, 10),
+  reason: ''
+})
+
+const myQuota = computed(() => {
+  const first = leavesData.value?.quotaSummaries?.[0]
+  return (
+    first || {
+      quota: clinicScheduleRes.value?.config?.defaultMonthlyLeaveQuota ?? 4,
+      used: 0,
+      pending: 0,
+      remaining: clinicScheduleRes.value?.config?.defaultMonthlyLeaveQuota ?? 4,
+      canRequest: true
+    }
+  )
+})
+
+const todayStatus = computed(() => {
+  const cfg = normalizeClinicScheduleConfig(clinicScheduleRes.value?.config)
+  const holidays = (clinicScheduleRes.value?.holidays || {}) as Record<string, string>
+  return evaluateClinicDateStatus(todayStr, cfg, holidays, auth.user?.doctorId || undefined)
+})
+
+const weeklyDayRows = computed(() => {
+  const list = (schedulesData.value?.items || []) as Array<{
+    dayOfWeek: number
+    startTime: string
+    endTime: string
+    isActive: boolean
+  }>
+  return [1, 2, 3, 4, 5, 6, 0].map((dow) => {
+    const dayShifts = list.filter((s) => s.dayOfWeek === dow && s.isActive)
+    return {
+      dayOfWeek: dow,
+      label: getDayNameId(dow),
+      shifts: dayShifts,
+      isOpen: dayShifts.length > 0
+    }
+  })
+})
+
+const todayShifts = computed(() => {
+  const dow = new Date(`${todayStr}T00:00:00Z`).getUTCDay()
+  return weeklyDayRows.value.find((d) => d.dayOfWeek === dow)?.shifts || []
+})
+
+async function submitLeaveRequest() {
+  if (!leaveForm.leaveDate || leaveForm.reason.trim().length < 3) {
+    toast.error('Data Belum Lengkap', 'Isi tanggal libur dan alasan minimal 3 karakter.')
+    return
+  }
+  submittingLeave.value = true
+  try {
+    const res = await $fetch<{ message: string }>('/api/doctor-leaves', {
+      method: 'POST',
+      body: {
+        leaveDate: leaveForm.leaveDate,
+        reason: leaveForm.reason.trim()
+      }
+    })
+    toast.success('Pengajuan Terkirim', res.message)
+    leaveForm.reason = ''
+    showLeaveRequestForm.value = false
+    await Promise.all([refreshLeaves(), refreshClinicSchedule()])
+  } catch (err: unknown) {
+    toast.error(
+      'Pengajuan Ditolak',
+      (err as { data?: { statusMessage?: string } })?.data?.statusMessage || 'Gagal mengajukan libur.'
+    )
+  } finally {
+    submittingLeave.value = false
+  }
+}
 
 const showDoctorScheduleForm = ref(false)
 const savingSchedule = ref(false)
@@ -248,89 +333,145 @@ async function updateQueueStatus(queueId: string, status: string) {
         />
       </div>
 
-      <!-- Jadwal Praktik & Hari Libur -->
+      <!-- Widget Jadwal Saya & Kuota Libur Bulanan (Section 7) -->
       <div class="lg:col-span-5 bg-white border border-[#D8E6E8] rounded-lg p-6 space-y-4">
         <div class="flex items-center justify-between gap-2 pb-3 border-b border-[#D8E6E8]">
           <div>
-            <span class="text-[11px] font-bold uppercase text-[#137A7F]">JADWAL MINGGUAN</span>
+            <span class="text-[11px] font-bold uppercase text-[#137A7F]">WIDGET JADWAL DOKTER</span>
             <h2 class="font-heading font-bold text-[18px] text-[#0B253A]">
-              Jadwal Praktik &amp; Hari Libur
+              Jadwal Saya
             </h2>
           </div>
           <button
             type="button"
-            class="px-3.5 py-2 min-h-11 rounded-md bg-[#EAF5F6] hover:bg-[#DFF1F2] text-[#137A7F] border border-[#D8E6E8] text-xs font-semibold transition-colors"
-            @click="showDoctorScheduleForm = !showDoctorScheduleForm"
+            class="px-3.5 py-2 min-h-11 rounded-md bg-[#137A7F] hover:bg-[#0E5F63] text-white text-xs font-semibold transition-colors"
+            @click="showLeaveRequestForm = !showLeaveRequestForm"
           >
-            {{ showDoctorScheduleForm ? 'Tutup' : 'Atur Libur' }}
+            {{ showLeaveRequestForm ? 'Tutup Form' : '+ Ajukan Hari Libur' }}
           </button>
         </div>
 
+        <!-- Jadwal Hari Ini -->
+        <div class="p-3.5 rounded-md bg-[#EAF5F6] border border-[#D8E6E8] space-y-1.5 text-xs">
+          <div class="flex items-center justify-between gap-2">
+            <span class="font-bold text-[#137A7F] uppercase text-[11px]">Jadwal Hari Ini</span>
+            <span
+              class="px-2.5 py-0.5 rounded-md font-bold text-[11px]"
+              :class="todayStatus.isOpen && todayShifts.length ? 'bg-emerald-100 text-emerald-800' : 'bg-[#FFF1F2] text-[#BE123C]'"
+            >
+              {{ !todayStatus.isOpen ? todayStatus.badge : todayShifts.length ? 'Hari Kerja' : 'Libur' }}
+            </span>
+          </div>
+          <p v-if="todayStatus.isOpen && todayShifts.length" class="font-semibold text-[#0B253A]">
+            {{ todayShifts.map((s) => `${s.startTime} - ${s.endTime} WIB`).join(' · ') }}
+          </p>
+          <p v-else class="text-[#BE123C] font-medium">
+            {{ !todayStatus.isOpen ? todayStatus.reason : 'Tidak ada jadwal praktik aktif hari ini.' }}
+          </p>
+        </div>
+
+        <!-- Kuota Libur Bulan Ini -->
+        <div class="grid grid-cols-3 gap-2 text-center">
+          <div class="p-3 rounded-md bg-[#F4F9F9] border border-[#D8E6E8]">
+            <span class="text-[10px] font-bold uppercase text-[#475569] block">Kuota Libur</span>
+            <strong class="font-heading text-sm text-[#0B253A]">{{ myQuota.quota }} Hari / Bln</strong>
+          </div>
+          <div class="p-3 rounded-md bg-[#F4F9F9] border border-[#D8E6E8]">
+            <span class="text-[10px] font-bold uppercase text-[#475569] block">Terpakai</span>
+            <strong class="font-heading text-sm text-[#BE123C]">{{ myQuota.used }} Hari</strong>
+          </div>
+          <div class="p-3 rounded-md bg-[#EAF5F6] border border-[#D8E6E8]">
+            <span class="text-[10px] font-bold uppercase text-[#137A7F] block">Sisa Kuota</span>
+            <strong class="font-heading text-sm text-[#137A7F]">{{ myQuota.remaining }} Hari</strong>
+          </div>
+        </div>
+
+        <!-- Form Pengajuan Hari Libur Dokter -->
         <form
-          v-if="showDoctorScheduleForm"
-          class="p-4 rounded-md bg-[#EAF5F6] border border-[#D8E6E8] space-y-3 text-xs"
-          @submit.prevent="saveMyWeeklySchedule"
+          v-if="showLeaveRequestForm"
+          class="p-4 rounded-md bg-[#F4F9F9] border border-[#D8E6E8] space-y-3 text-xs"
+          @submit.prevent="submitLeaveRequest"
         >
+          <p class="font-bold text-[#0B253A]">
+            Pengajuan Hari Libur Dokter (Maks. {{ myQuota.quota }} Hari / Bulan)
+          </p>
           <div>
-            <label class="block font-semibold text-[#BE123C] mb-1">
-              Pilih 1 Tanggal &amp; Hari Libur Saya
-            </label>
+            <label class="block font-semibold text-[#0B253A] mb-1">Tanggal Libur</label>
             <input
-              v-model="doctorScheduleForm.offDate"
+              v-model="leaveForm.leaveDate"
               type="date"
               required
               class="w-full px-3.5 py-2.5 min-h-11 rounded-md border border-[#D8E6E8] bg-white font-semibold text-[#0B253A]"
             >
-            <span class="block text-[11px] font-bold text-[#BE123C] mt-1">
-              Hari &amp; Tanggal Libur: {{ formatDayAndDateId(doctorScheduleForm.offDate) }}
-            </span>
           </div>
-          <div class="grid grid-cols-2 gap-2.5">
-            <div>
-              <label class="block font-semibold text-[#0B253A] mb-1">Jam Mulai Praktik</label>
-              <input
-                v-model="doctorScheduleForm.startTime"
-                type="time"
-                required
-                class="w-full px-3.5 py-2.5 min-h-11 rounded-md border border-[#D8E6E8] bg-white"
-              >
-            </div>
-            <div>
-              <label class="block font-semibold text-[#0B253A] mb-1">Jam Selesai Praktik</label>
-              <input
-                v-model="doctorScheduleForm.endTime"
-                type="time"
-                required
-                class="w-full px-3.5 py-2.5 min-h-11 rounded-md border border-[#D8E6E8] bg-white"
-              >
-            </div>
+          <div>
+            <label class="block font-semibold text-[#0B253A] mb-1">Alasan Pengajuan</label>
+            <input
+              v-model="leaveForm.reason"
+              type="text"
+              required
+              placeholder="Contoh: Keperluan keluarga / seminar kedokteran gigi"
+              class="w-full px-3.5 py-2.5 min-h-11 rounded-md border border-[#D8E6E8] bg-white"
+            >
           </div>
           <button
             type="submit"
-            :disabled="savingSchedule"
-            class="w-full py-2.5 min-h-11 rounded-md bg-[#137A7F] hover:bg-[#0E5F63] text-white font-semibold"
+            :disabled="submittingLeave || !myQuota.canRequest"
+            class="w-full py-2.5 min-h-11 rounded-md bg-[#137A7F] hover:bg-[#0E5F63] disabled:opacity-50 text-white font-semibold"
           >
-            {{ savingSchedule ? 'Menyimpan...' : 'Simpan Jadwal & Hari Libur' }}
+            {{
+              !myQuota.canRequest
+                ? 'Kuota Libur Bulan Ini Habis'
+                : submittingLeave
+                  ? 'Mengirim...'
+                  : 'Kirim Pengajuan Libur'
+            }}
           </button>
         </form>
 
-        <div class="space-y-2 text-xs">
+        <!-- Jadwal Minggu Ini -->
+        <div class="space-y-1.5 text-xs">
+          <p class="font-bold uppercase text-[11px] text-[#137A7F]">Jadwal Minggu Ini</p>
           <div
-            v-for="sch in (schedulesData?.items || []).slice(0, 7)"
-            :key="sch.id"
-            class="p-3 rounded-md border flex items-center justify-between gap-2"
-            :class="sch.isActive ? 'bg-[#F4F9F9] border-[#D8E6E8]' : 'bg-[#FFF1F2] border-rose-200'"
+            v-for="row in weeklyDayRows"
+            :key="row.dayOfWeek"
+            class="p-2.5 rounded-md border flex items-center justify-between gap-2"
+            :class="row.isOpen ? 'bg-[#F4F9F9] border-[#D8E6E8]' : 'bg-[#FFF1F2]/60 border-rose-200'"
           >
-            <span class="font-semibold text-[#0B253A]">
-              {{ formatScheduleDayAndDate(sch.dayOfWeek) }}
+            <span class="font-semibold text-[#0B253A]">{{ row.label }}</span>
+            <span v-if="row.isOpen" class="text-[#137A7F] font-bold text-right">
+              {{ row.shifts.map((s) => `${s.startTime} - ${s.endTime}`).join(' & ') }} WIB
             </span>
-            <span v-if="sch.isActive" class="text-[#137A7F] font-bold">
-              {{ sch.startTime }} - {{ sch.endTime }} WIB
+            <span v-else class="px-2 py-0.5 rounded-md bg-white text-[#BE123C] border border-rose-200 font-bold text-[11px]">
+              Libur
             </span>
-            <span v-else class="px-2.5 py-0.5 rounded-md bg-white text-[#BE123C] border border-rose-200 font-bold">
-              HARI LIBUR
+          </div>
+        </div>
+
+        <!-- Daftar Status Pengajuan Cuti -->
+        <div v-if="(leavesData?.requests || []).length" class="space-y-1.5 text-xs pt-2 border-t border-[#D8E6E8]">
+          <p class="font-bold uppercase text-[11px] text-[#137A7F]">Riwayat Pengajuan Libur Saya</p>
+          <div
+            v-for="req in (leavesData?.requests || []).slice(0, 4)"
+            :key="req.id"
+            class="p-2.5 rounded-md border border-[#D8E6E8] bg-white flex items-center justify-between gap-2"
+          >
+            <div>
+              <strong class="text-[#0B253A]">{{ formatDateId(req.leaveDate) }}</strong>
+              <span class="text-[#475569] block">{{ req.reason }}</span>
+            </div>
+            <span
+              class="px-2.5 py-1 rounded-md text-[10px] font-bold shrink-0"
+              :class="
+                req.status === 'APPROVED'
+                  ? 'bg-emerald-100 text-emerald-800'
+                  : req.status === 'REJECTED'
+                    ? 'bg-rose-100 text-[#BE123C]'
+                    : 'bg-amber-100 text-[#B45309]'
+              "
+            >
+              {{ req.status }}
             </span>
-            <span class="text-[#475569]">Slot {{ sch.slotDurationMin }}m</span>
           </div>
         </div>
       </div>

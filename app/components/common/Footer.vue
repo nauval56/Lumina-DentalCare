@@ -2,7 +2,17 @@
   <footer class="bg-[#0B253A]">
     <div class="max-w-[1440px] mx-auto px-5 lg:px-20 pt-11 pb-9 flex flex-col md:flex-row md:justify-between gap-8">
       <div class="flex flex-col gap-[10px]">
-        <p class="font-heading font-bold text-[18px] text-white">Lumina Dental Care · Pontianak</p>
+        <div class="flex items-center gap-3">
+          <img
+            src="/images/lumina-logo.png"
+            alt="Logo Lumina Dental Care"
+            width="48"
+            height="48"
+            loading="lazy"
+            class="size-12 rounded-md object-contain bg-white p-1 shrink-0"
+          >
+          <p class="font-heading font-bold text-[18px] text-white">Lumina Dental Care · Pontianak</p>
+        </div>
         <p class="text-[13px] text-[#DFF1F2] max-w-[430px]">
           Senyum Cerah Dimulai Dari Perawatan Terbaik. Sistem manajemen klinik gigi terintegrasi dengan rekam medis SOAP, peta Odontogram FDI 52 gigi, dan farmasi FEFO.
         </p>

@@ -201,5 +201,3 @@ Akun demonstrasi dibuat oleh `prisma/seed.ts`:
 - **TiDB Cloud / MySQL**: Wajib diisi melalui `DATABASE_URL` pada file `.env`.
 - **Gmail SMTP (Reset Password)**: Menggunakan `smtp.gmail.com:465` (TLS). Isi `GMAIL_USER` dan `GMAIL_APP_PASSWORD` di `.env` atau melalui halaman **Admin Dashboard > Pengaturan Sistem (`/admin/settings`)**.
 - **Payment Gateway**: Secara default menggunakan `MockPaymentGatewayAdapter` (`PAYMENT_GATEWAY_PROVIDER="mock"`) untuk simulasi development. Untuk produksi, implementasikan interface `PaymentGatewayAdapter` di `server/services/paymentGatewayService.ts` beserta `PAYMENT_GATEWAY_SERVER_KEY` dan `PAYMENT_WEBHOOK_SECRET`.
-#   L u m i n a - D e n t a l C a r e  
- 

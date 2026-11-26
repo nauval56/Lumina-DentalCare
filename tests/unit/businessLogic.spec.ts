@@ -6,7 +6,8 @@ import {
 } from '../../app/utils/odontogramAgeRules'
 import {
   createDefaultClinicScheduleConfig,
-  evaluateClinicDateStatus
+  evaluateClinicDateStatus,
+  evaluateDoctorLeaveQuota
 } from '../../app/utils/clinicScheduleRules'
 import {
   hashPassword,
@@ -166,7 +167,7 @@ describe('Lumina Dental Care — Unit Tests (Security, Appointment, FEFO, FDI & 
 
     const closedWeekday = evaluateClinicDateStatus('2026-11-26', cfg)
     expect(closedWeekday.isOpen).toBe(false)
-    expect(closedWeekday.badge).toBe('Klinik Tutup')
+    expect(closedWeekday.badge).toBe('Libur Klinik')
 
     const reducedWeekday = evaluateClinicDateStatus('2026-11-27', cfg)
     expect(reducedWeekday.isOpen).toBe(true)
@@ -174,5 +175,52 @@ describe('Lumina Dental Care — Unit Tests (Security, Appointment, FEFO, FDI & 
     expect(reducedWeekday.badge).toBe('Jam Praktek Terbatas')
     expect(reducedWeekday.openTime).toBe('09:00')
     expect(reducedWeekday.closeTime).toBe('14:00')
+  })
+
+  it('10. Doctor monthly leave quota, approved doctor leave, and special practice dates work correctly', () => {
+    const cfg = createDefaultClinicScheduleConfig()
+    cfg.defaultMonthlyLeaveQuota = 2
+    cfg.doctorLeaveRequests = [
+      {
+        id: 'l1',
+        doctorId: 'doc-1',
+        leaveDate: '2026-11-10',
+        reason: 'Seminar',
+        status: 'APPROVED',
+        createdAt: '2026-11-01T00:00:00Z',
+        updatedAt: '2026-11-01T00:00:00Z'
+      },
+      {
+        id: 'l2',
+        doctorId: 'doc-1',
+        leaveDate: '2026-11-12',
+        reason: 'Keluarga',
+        status: 'PENDING',
+        createdAt: '2026-11-02T00:00:00Z',
+        updatedAt: '2026-11-02T00:00:00Z'
+      }
+    ]
+
+    const quota = evaluateDoctorLeaveQuota('doc-1', '2026-11', cfg)
+    expect(quota.quota).toBe(2)
+    expect(quota.used).toBe(1)
+    expect(quota.pending).toBe(1)
+    expect(quota.remaining).toBe(1)
+    expect(quota.canRequest).toBe(false)
+
+    const onLeave = evaluateClinicDateStatus('2026-11-10', cfg, {}, 'doc-1')
+    expect(onLeave.isOpen).toBe(false)
+    expect(onLeave.status).toBe('DOCTOR_LEAVE')
+
+    cfg.specialPracticeDates['2026-12-25'] = {
+      date: '2026-12-25',
+      openTime: '09:00',
+      closeTime: '14:00',
+      reason: 'Siaga Libur Natal'
+    }
+    const special = evaluateClinicDateStatus('2026-12-25', cfg, {}, 'doc-1')
+    expect(special.isOpen).toBe(true)
+    expect(special.status).toBe('SPECIAL_PRACTICE')
+    expect(special.badge).toBe('Hari Praktik Khusus')
   })
 })

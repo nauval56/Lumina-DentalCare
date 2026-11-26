@@ -80,10 +80,10 @@ const rating = computed(() => {
 })
 
 const metrics = computed(() => [
-  { label: 'TINDAKAN KLINIS', value: `${services.value.length} Layanan`, note: 'Tarif IDR transparan' },
-  { label: 'STANDAR ODONTOGRAM', value: '52 Gigi FDI', note: 'Permanen & gigi susu' },
-  { label: 'RATING ULASAN', value: rating.value, note: 'Ulasan pasien terverifikasi' },
-  { label: 'TIM SPESIALIS', value: `${doctors.value.length} Dokter`, note: 'Jadwal praktik aktif' }
+  { label: 'TINDAKAN KLINIS', value: `${services.value.length} Layanan`, note: 'Tarif IDR transparan', iconSrc: '/figma/clipboard.svg', lucideIcon: '' },
+  { label: 'STANDAR ODONTOGRAM', value: '52 Gigi FDI', note: 'Permanen & gigi susu', iconSrc: '/figma/tooth.svg', lucideIcon: '' },
+  { label: 'RATING ULASAN', value: rating.value, note: 'Ulasan pasien terverifikasi', iconSrc: '', lucideIcon: 'i-lucide-star' },
+  { label: 'TIM SPESIALIS', value: `${doctors.value.length} Dokter`, note: 'Jadwal praktik aktif', iconSrc: '/figma/user-md.svg', lucideIcon: '' }
 ])
 
 const showClinicTourModal = ref(false)
@@ -247,7 +247,13 @@ const tourSlides = [
             class="bg-white border border-[#D8E6E8] rounded-lg p-5 h-[108px] flex items-center gap-4"
           >
             <span class="bg-[#DFF1F2] rounded-full size-12 shrink-0 flex items-center justify-center">
-              <img src="/figma/clipboard.svg" alt="" width="22" height="22" class="size-[22px]">
+              <UIcon
+                v-if="m.lucideIcon"
+                :name="m.lucideIcon"
+                class="size-[22px] text-[#F59E0B] fill-[#F59E0B]"
+                aria-hidden="true"
+              />
+              <img v-else :src="m.iconSrc" alt="" width="22" height="22" class="size-[22px]">
             </span>
             <span class="flex flex-col gap-[3px] min-w-0">
               <span class="text-[11px] font-bold text-[#137A7F]">{{ m.label }}</span>
@@ -384,7 +390,7 @@ const tourSlides = [
               </div>
             </div>
             <p v-else class="text-xs text-[#475569] bg-white border border-[#D8E6E8] rounded-md p-3.5">
-              Seluruh jadwal praktek Senin–Sabtu berjalan normal. Hari Minggu &amp; tanggal merah pemerintah otomatis libur.
+              Seluruh jadwal praktek Senin–Sabtu berjalan normal. Hari Minggu &amp; tanggal merah pemerintah libur.
             </p>
           </div>
         </div>

@@ -390,15 +390,7 @@ function getMutationLabel(type: string) {
           @click="openCreateMedicineModal()"
         >
           <UIcon name="i-lucide-plus-circle" class="w-4 h-4" />
-          <span>1. Tambah Obat</span>
-        </button>
-        <button
-          type="button"
-          class="inline-flex items-center gap-2 px-4 py-2.5 min-h-11 rounded-md bg-[#15803D] hover:bg-emerald-800 text-white text-[12px] font-semibold transition-colors"
-          @click="openCreateBatchModal()"
-        >
-          <UIcon name="i-lucide-package-plus" class="w-4 h-4" />
-          <span>2. Tambah Batch</span>
+          <span>+ Tambah Obat</span>
         </button>
         <button
           type="button"
@@ -406,7 +398,7 @@ function getMutationLabel(type: string) {
           @click="openStockOutModal()"
         >
           <UIcon name="i-lucide-package-minus" class="w-4 h-4" />
-          <span>3. Catat Obat Keluar</span>
+          <span>Catat Obat Keluar (FEFO)</span>
         </button>
       </div>
     </div>
@@ -571,31 +563,31 @@ function getMutationLabel(type: string) {
                 <span v-else class="text-slate-400">Belum ada batch aktif</span>
               </td>
               <td class="py-3.5 px-4 text-right">
-                <div class="inline-flex flex-wrap items-center justify-end gap-1.5">
+                <div class="inline-flex items-center justify-end gap-1.5 whitespace-nowrap">
                   <button
                     type="button"
-                    class="px-3 py-1.5 rounded-lg bg-emerald-50 hover:bg-emerald-100 text-emerald-700 border border-emerald-200 text-xs font-semibold"
+                    class="px-3 py-2 min-h-11 rounded-md bg-emerald-50 hover:bg-emerald-100 text-emerald-700 border border-emerald-200 text-xs font-semibold"
                     @click="openCreateBatchModal(m.id)"
                   >
                     + Tambah Stok
                   </button>
                   <button
                     type="button"
-                    class="px-3 py-1.5 rounded-lg bg-[#EAF5F6] hover:bg-sky-100 text-[#137A7F] border border-[#D8E6E8] text-xs font-semibold"
+                    class="px-3 py-2 min-h-11 rounded-md bg-[#EAF5F6] hover:bg-sky-100 text-[#137A7F] border border-[#D8E6E8] text-xs font-semibold"
                     @click="batchMedicineFilter = m.id; activeTab = 'BATCHES'"
                   >
                     Lihat Batch ({{ (m.batches || []).length }})
                   </button>
                   <button
                     type="button"
-                    class="px-3 py-1.5 rounded-lg border border-[#D8E6E8] text-xs font-semibold text-slate-700 hover:bg-[#F4F9F9]"
+                    class="px-3 py-2 min-h-11 rounded-md border border-[#D8E6E8] text-xs font-semibold text-slate-700 hover:bg-[#F4F9F9]"
                     @click="openEditMedicineModal(m)"
                   >
                     Edit
                   </button>
                   <button
                     type="button"
-                    class="px-3 py-1.5 rounded-lg bg-rose-50 hover:bg-rose-100 text-rose-700 text-xs font-semibold"
+                    class="px-3 py-2 min-h-11 rounded-md bg-rose-50 hover:bg-rose-100 text-rose-700 text-xs font-semibold"
                     @click="deleteMedicine(m)"
                   >
                     Hapus

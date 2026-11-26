@@ -15,7 +15,20 @@ export default defineEventHandler(async (event) => {
     throw createError({ statusCode: 400, statusMessage: 'ID antrean diperlukan.' })
   }
 
-  const existing = await prisma.queue.findUnique({ where: { id } })
+  const existing = await prisma.queue.findUnique({
+    where: { id },
+    include: {
+      appointment: {
+        include: {
+          medicalRecord: {
+            include: {
+              invoices: { select: { id: true, status: true } }
+            }
+          }
+        }
+      }
+    }
+  })
   if (!existing) {
     throw createError({ statusCode: 404, statusMessage: 'Antrean tidak ditemukan.' })
   }
@@ -27,6 +40,18 @@ export default defineEventHandler(async (event) => {
   }
 
   const nextStatus = parsed.data.status
+  if (nextStatus === 'COMPLETED') {
+    const hasPaidInvoice = Boolean(
+      existing.appointment?.medicalRecord?.invoices?.some((inv) => inv.status === 'PAID')
+    )
+    if (!hasPaidInvoice) {
+      throw createError({
+        statusCode: 400,
+        statusMessage:
+          'Pasien belum menyelesaikan pembayaran. Antrean hanya dapat diselesaikan setelah tagihan berstatus Lunas (PAID).'
+      })
+    }
+  }
   const updated = await prisma.$transaction(async (tx) => {
     const q = await tx.queue.update({
       where: { id },

@@ -30,7 +30,13 @@ watch(
   <header class="bg-[#EAF5F6] sticky top-0 z-40">
     <div class="max-w-[1440px] mx-auto h-[84px] px-5 lg:px-16 flex items-center justify-between gap-4">
       <NuxtLink to="/" class="flex items-center gap-3 shrink-0">
-        <img src="/figma/logo.svg" alt="" width="40" height="40" class="size-10">
+        <img
+          src="/images/lumina-logo.png"
+          alt="Logo Lumina Dental Care"
+          width="44"
+          height="44"
+          class="size-11 rounded-md object-contain bg-white p-0.5 border border-[#D8E6E8]"
+        >
         <span class="flex flex-col gap-px">
           <span class="font-heading font-bold text-[18px] text-[#0B253A] leading-normal">Lumina Dental Care</span>
           <span class="text-[11px] font-medium text-[#475569] leading-normal">Klinik Gigi Spesialis · Pontianak</span>

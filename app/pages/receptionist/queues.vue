@@ -137,7 +137,7 @@ async function updateStatus(id: string, status: string) {
               <button
                 v-if="q.status === 'WAITING'"
                 type="button"
-                class="px-3 py-1.5 rounded-lg bg-amber-500 text-white text-xs font-semibold"
+                class="px-3.5 py-2 min-h-11 rounded-md bg-amber-500 text-white text-xs font-semibold"
                 @click="updateStatus(q.id, 'CALLED')"
               >
                 Panggil
@@ -145,19 +145,28 @@ async function updateStatus(id: string, status: string) {
               <button
                 v-if="q.status === 'CALLED' || q.status === 'WAITING'"
                 type="button"
-                class="px-3 py-1.5 rounded-lg bg-[#137A7F] text-white text-xs font-semibold"
+                class="px-3.5 py-2 min-h-11 rounded-md bg-[#137A7F] text-white text-xs font-semibold"
                 @click="updateStatus(q.id, 'IN_PROGRESS')"
               >
                 Masuk Ruang
               </button>
               <button
-                v-if="q.status === 'IN_PROGRESS'"
+                v-if="
+                  q.status === 'IN_PROGRESS' &&
+                  q.appointment?.medicalRecord?.invoices?.some((inv: { status: string }) => inv.status === 'PAID')
+                "
                 type="button"
-                class="px-3 py-1.5 rounded-lg bg-emerald-600 text-white text-xs font-semibold"
+                class="px-3.5 py-2 min-h-11 rounded-md bg-emerald-600 text-white text-xs font-semibold"
                 @click="updateStatus(q.id, 'COMPLETED')"
               >
                 Selesai
               </button>
+              <span
+                v-else-if="q.status === 'IN_PROGRESS'"
+                class="px-3 py-1.5 rounded-md bg-[#FFFBEB] border border-amber-200 text-[#B45309] text-xs font-semibold"
+              >
+                Menunggu Dokter &amp; Pembayaran
+              </span>
             </div>
           </div>
         </div>

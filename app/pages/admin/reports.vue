@@ -18,10 +18,10 @@ const [
   useFetch('/api/reports/inventory')
 ])
 
-function exportCurrentReportCsv() {
+function exportReportCsv(targetTab: 'REVENUE' | 'APPOINTMENTS' | 'PATIENTS' | 'INVENTORY' = activeTab.value) {
   if (!import.meta.client) return
   let rows: string[][] = []
-  if (activeTab.value === 'REVENUE') {
+  if (targetTab === 'REVENUE') {
     rows = [
       ['No Kwitansi', 'No Invoice', 'Pasien', 'Metode', 'Nominal IDR', 'Tanggal'],
       ...(revData.value?.items || []).map((p: Record<string, unknown>) => [
@@ -33,7 +33,7 @@ function exportCurrentReportCsv() {
         String(p.createdAt)
       ])
     ]
-  } else if (activeTab.value === 'APPOINTMENTS') {
+  } else if (targetTab === 'APPOINTMENTS') {
     rows = [
       ['Kode Booking', 'Pasien', 'Dokter', 'Layanan', 'Tanggal', 'Status'],
       ...(apptData.value?.items || []).map((a: Record<string, unknown>) => [
@@ -45,7 +45,7 @@ function exportCurrentReportCsv() {
         String(a.status)
       ])
     ]
-  } else if (activeTab.value === 'PATIENTS') {
+  } else if (targetTab === 'PATIENTS') {
     rows = [
       ['No RM', 'Nama Pasien', 'Telepon', 'Total Appointment'],
       ...(patData.value?.items || []).map((p: Record<string, unknown>) => [
@@ -74,33 +74,23 @@ function exportCurrentReportCsv() {
   const url = URL.createObjectURL(blob)
   const a = document.createElement('a')
   a.href = url
-  a.download = `laporan-${activeTab.value.toLowerCase()}-lumina.csv`
+  a.download = `laporan-${targetTab.toLowerCase()}-lumina.csv`
   a.click()
   URL.revokeObjectURL(url)
-  toast.success('Laporan Diunduh', `File CSV laporan ${activeTab.value} berhasil diunduh.`)
+  toast.success('Laporan Diunduh', `File CSV laporan ${targetTab} berhasil diunduh.`)
 }
 </script>
 
 <template>
   <!-- Figma 35. Admin Laporan Operasional (/admin/reports) -->
   <div class="flex flex-col gap-[22px]">
-    <div class="bg-[#EAF5F6] border border-[#D8E6E8] rounded-lg p-[26px] flex flex-col sm:flex-row sm:items-center justify-between gap-4">
-      <div class="flex flex-col gap-1">
-        <span class="text-[11px] font-bold uppercase text-[#137A7F]">
-          ADMIN · LAPORAN OPERASIONAL &amp; KEUANGAN KLINIK
-        </span>
-        <h1 class="font-heading font-bold text-[24px] text-[#0B253A]">
-          Pusat Laporan &amp; Export Data
-        </h1>
-      </div>
-      <button
-        type="button"
-        class="inline-flex items-center gap-2 px-5 py-2.5 min-h-11 rounded-md bg-[#137A7F] hover:bg-[#0E5F63] text-white text-[13px] font-semibold transition-colors"
-        @click="exportCurrentReportCsv"
-      >
-        <UIcon name="i-lucide-download" class="w-4 h-4" />
-        <span>Export Laporan CSV</span>
-      </button>
+    <div class="bg-[#EAF5F6] border border-[#D8E6E8] rounded-lg p-[26px] flex flex-col gap-1">
+      <span class="text-[11px] font-bold uppercase text-[#137A7F]">
+        ADMIN · LAPORAN OPERASIONAL &amp; KEUANGAN KLINIK
+      </span>
+      <h1 class="font-heading font-bold text-[24px] text-[#0B253A]">
+        Pusat Laporan &amp; Export Data
+      </h1>
     </div>
 
     <div class="flex flex-wrap gap-2">
@@ -127,13 +117,23 @@ function exportCurrentReportCsv() {
 
     <!-- Tab Pendapatan -->
     <div v-if="activeTab === 'REVENUE'" class="lumina-card p-6 space-y-4">
-      <div class="flex items-center justify-between">
+      <div class="flex flex-wrap items-center justify-between gap-3">
         <h2 class="font-heading font-bold text-base text-[#0B253A]">
           Rincian Pendapatan Terverifikasi
         </h2>
-        <strong class="font-heading font-bold text-lg text-emerald-600">
-          Total: {{ formatRupiah(revData?.totalRevenue ?? 0) }}
-        </strong>
+        <div class="flex flex-wrap items-center gap-3">
+          <strong class="font-heading font-bold text-lg text-emerald-600">
+            Total: {{ formatRupiah(revData?.totalRevenue ?? 0) }}
+          </strong>
+          <button
+            type="button"
+            class="inline-flex items-center gap-2 px-4 py-2 min-h-11 rounded-md bg-[#137A7F] hover:bg-[#0E5F63] text-white text-xs font-semibold transition-colors"
+            @click="exportReportCsv('REVENUE')"
+          >
+            <UIcon name="i-lucide-download" class="w-4 h-4" />
+            <span>Export CSV Pendapatan</span>
+          </button>
+        </div>
       </div>
       <div class="overflow-x-auto">
         <table class="w-full text-left border-collapse text-sm">
@@ -163,9 +163,19 @@ function exportCurrentReportCsv() {
 
     <!-- Tab Appointment -->
     <div v-else-if="activeTab === 'APPOINTMENTS'" class="lumina-card p-6 space-y-4">
-      <h2 class="font-heading font-bold text-base text-[#0B253A]">
-        Laporan Kunjungan & Appointment ({{ apptData?.total ?? 0 }})
-      </h2>
+      <div class="flex flex-wrap items-center justify-between gap-3">
+        <h2 class="font-heading font-bold text-base text-[#0B253A]">
+          Laporan Kunjungan &amp; Appointment ({{ apptData?.total ?? 0 }})
+        </h2>
+        <button
+          type="button"
+          class="inline-flex items-center gap-2 px-4 py-2 min-h-11 rounded-md bg-[#137A7F] hover:bg-[#0E5F63] text-white text-xs font-semibold transition-colors"
+          @click="exportReportCsv('APPOINTMENTS')"
+        >
+          <UIcon name="i-lucide-download" class="w-4 h-4" />
+          <span>Export CSV Appointment</span>
+        </button>
+      </div>
       <div class="overflow-x-auto">
         <table class="w-full text-left border-collapse text-sm">
           <thead>
@@ -194,9 +204,19 @@ function exportCurrentReportCsv() {
 
     <!-- Tab Pasien -->
     <div v-else-if="activeTab === 'PATIENTS'" class="lumina-card p-6 space-y-4">
-      <h2 class="font-heading font-bold text-base text-[#0B253A]">
-        Rekapitulasi Pasien ({{ patData?.total ?? 0 }})
-      </h2>
+      <div class="flex flex-wrap items-center justify-between gap-3">
+        <h2 class="font-heading font-bold text-base text-[#0B253A]">
+          Rekapitulasi Pasien ({{ patData?.total ?? 0 }})
+        </h2>
+        <button
+          type="button"
+          class="inline-flex items-center gap-2 px-4 py-2 min-h-11 rounded-md bg-[#137A7F] hover:bg-[#0E5F63] text-white text-xs font-semibold transition-colors"
+          @click="exportReportCsv('PATIENTS')"
+        >
+          <UIcon name="i-lucide-download" class="w-4 h-4" />
+          <span>Export CSV Pasien</span>
+        </button>
+      </div>
       <div class="overflow-x-auto">
         <table class="w-full text-left border-collapse text-sm">
           <thead>
@@ -223,9 +243,19 @@ function exportCurrentReportCsv() {
 
     <!-- Tab Persediaan Obat -->
     <div v-else class="lumina-card p-6 space-y-4">
-      <h2 class="font-heading font-bold text-base text-[#0B253A]">
-        Laporan Persediaan Obat & Mutasi Stok
-      </h2>
+      <div class="flex flex-wrap items-center justify-between gap-3">
+        <h2 class="font-heading font-bold text-base text-[#0B253A]">
+          Laporan Persediaan Obat &amp; Mutasi Stok
+        </h2>
+        <button
+          type="button"
+          class="inline-flex items-center gap-2 px-4 py-2 min-h-11 rounded-md bg-[#137A7F] hover:bg-[#0E5F63] text-white text-xs font-semibold transition-colors"
+          @click="exportReportCsv('INVENTORY')"
+        >
+          <UIcon name="i-lucide-download" class="w-4 h-4" />
+          <span>Export CSV Obat</span>
+        </button>
+      </div>
       <div class="overflow-x-auto">
         <table class="w-full text-left border-collapse text-sm">
           <thead>

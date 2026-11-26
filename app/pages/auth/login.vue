@@ -31,19 +31,6 @@ const isBookingRedirect = computed(() =>
   typeof route.query.redirect === 'string' && route.query.redirect.includes('/patient/appointments')
 )
 
-const demoAccounts = [
-  { label: 'Akun Demo 1 (Budi)', email: 'budi.santoso@email.id' },
-  { label: 'Akun Demo 2 (drg. Amanda)', email: 'drg.amanda@luminadental.id' },
-  { label: 'Akun Demo 3 (Siti)', email: 'resepsionis@luminadental.id' },
-  { label: 'Akun Demo 4 (Nadya)', email: 'admin@luminadental.id' }
-]
-
-function fillDemo(email: string) {
-  activeTab.value = 'LOGIN'
-  form.email = email
-  form.password = 'Lumina123!'
-}
-
 function resolveAfterAuthPath(userRole: string) {
   const redirect = typeof route.query.redirect === 'string' ? route.query.redirect : ''
   if (redirect && userRole === 'PATIENT' && redirect.startsWith('/patient')) {
@@ -181,24 +168,6 @@ async function handleRegister() {
           >
             {{ auth.loading ? 'Memverifikasi...' : isBookingRedirect ? 'Masuk & Lanjutkan Booking' : 'Masuk Sekarang' }}
           </button>
-        </div>
-
-        <div class="pt-3 border-t border-[#D8E6E8] space-y-2 w-full">
-          <p class="text-[11px] font-bold uppercase tracking-wider text-[#475569]">
-            [DATA DEMO SEED DEVELOPMENT] Sandi: Lumina123!
-          </p>
-          <div class="grid grid-cols-2 gap-2">
-            <button
-              v-for="acc in demoAccounts"
-              :key="acc.email"
-              type="button"
-              class="p-2.5 min-h-11 rounded-md border border-[#D8E6E8] hover:border-[#137A7F] hover:bg-[#EAF5F6] text-left transition-colors"
-              @click="fillDemo(acc.email)"
-            >
-              <span class="text-[12px] font-semibold text-[#0B253A] block">{{ acc.label }}</span>
-              <span class="text-[11px] text-[#137A7F] block truncate">{{ acc.email }}</span>
-            </button>
-          </div>
         </div>
       </form>
 

@@ -100,20 +100,13 @@ watch(
     >
       <div class="p-4 border-b border-[#D8E6E8] flex items-center justify-between gap-2">
         <NuxtLink to="/" class="flex items-center gap-3 min-w-0">
-          <div
-            class="w-10 h-10 rounded-md bg-[#137A7F] flex items-center justify-center text-white shrink-0"
-            aria-hidden="true"
+          <img
+            src="/images/lumina-logo.png"
+            alt="Logo Lumina Dental Care"
+            width="40"
+            height="40"
+            class="w-10 h-10 rounded-md object-contain bg-white p-0.5 border border-[#D8E6E8] shrink-0"
           >
-            <svg width="20" height="20" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg">
-              <path
-                d="M7 3C4.8 3 3 4.8 3 7.2C3 10.6 4.7 13.4 5.6 16.8C6.2 19.1 6.8 21 8.3 21C9.7 21 10.2 18.2 12 18.2C13.8 18.2 14.3 21 15.7 21C17.2 21 17.8 19.1 18.4 16.8C19.3 13.4 21 10.6 21 7.2C21 4.8 19.2 3 17 3C15.1 3 13.6 4.1 12 4.1C10.4 4.1 8.9 3 7 3Z"
-                stroke="currentColor"
-                stroke-width="2"
-                stroke-linecap="round"
-                stroke-linejoin="round"
-              />
-            </svg>
-          </div>
           <div v-if="!sidebarCollapsed" class="min-w-0">
             <span class="font-heading font-bold text-base text-[#0B253A] block leading-tight truncate">
               Lumina Dental

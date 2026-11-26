@@ -71,6 +71,7 @@ export async function verifyAppointmentRequest(
   }
 
   const normalizedDate = new Date(`${input.appointmentDate}T00:00:00.000Z`)
+  const dayEnd = new Date(`${input.appointmentDate}T23:59:59.999Z`)
   const dayOfWeek = normalizedDate.getUTCDay()
 
   // Validasi waktu tidak boleh sudah terlewat (Asia/Jakarta UTC+7)
@@ -114,17 +115,22 @@ export async function verifyAppointmentRequest(
   const endMin = startMin + durationMinutes
   const computedEndTime = minutesToTime(endMin)
 
-  // 4. Klinik beroperasi pada waktu tersebut (bukan hari libur & sesuai jam operasional)
-  if (holiday) {
-    errors.push(`Klinik tutup pada tanggal ${input.appointmentDate} (${holiday.name}).`)
-  }
-
+  // 4. Klinik & Dokter beroperasi pada waktu tersebut (bukan libur nasional, cuti dokter, & sesuai jam operasional)
   const scheduleConfig = normalizeClinicScheduleConfig(clinicSetting?.operatingHoursJson)
   const dbHolidayMap: Record<string, string> = {}
   for (const h of allHolidays) {
     dbHolidayMap[h.date.toISOString().slice(0, 10)] = h.name
   }
-  const clinicDayStatus = evaluateClinicDateStatus(input.appointmentDate, scheduleConfig, dbHolidayMap)
+  const clinicDayStatus = evaluateClinicDateStatus(
+    input.appointmentDate,
+    scheduleConfig,
+    dbHolidayMap,
+    input.doctorId
+  )
+
+  if (holiday && clinicDayStatus.status !== 'SPECIAL_PRACTICE') {
+    errors.push(`Klinik tutup pada tanggal ${input.appointmentDate} (${holiday.name}).`)
+  }
 
   if (!clinicDayStatus.isOpen) {
     errors.push(clinicDayStatus.reason)
@@ -138,7 +144,7 @@ export async function verifyAppointmentRequest(
     }
   }
 
-  // 5. Dokter memiliki jadwal praktik pada hari & jam tersebut
+  // 5. Dokter memiliki jadwal praktik pada hari & jam tersebut (atau Hari Praktik Khusus)
   if (doctor) {
     const matchingSchedule = doctor.schedules.find((sch) => {
       const schStart = timeToMinutes(sch.startTime)
@@ -146,15 +152,15 @@ export async function verifyAppointmentRequest(
       return startMin >= schStart && endMin <= schEnd
     })
 
-    if (!matchingSchedule) {
+    if (!matchingSchedule && clinicDayStatus.status !== 'SPECIAL_PRACTICE') {
       errors.push('Dokter tidak memiliki jadwal praktik pada hari dan rentang jam yang dipilih.')
-    } else {
+    } else if (matchingSchedule) {
       // Periksa kuota maksimum pasien pada jadwal tersebut
       const activeCount = await prisma.appointment.count({
         where: {
           doctorId: input.doctorId,
-          appointmentDate: normalizedDate,
-          status: { in: ['PENDING', 'CONFIRMED', 'CHECKED_IN', 'IN_TREATMENT'] },
+          appointmentDate: { gte: normalizedDate, lte: dayEnd },
+          status: { in: ['PENDING', 'CONFIRMED', 'CHECKED_IN', 'IN_TREATMENT', 'COMPLETED'] },
           ...(input.excludeAppointmentId ? { id: { not: input.excludeAppointmentId } } : {})
         }
       })
@@ -167,8 +173,8 @@ export async function verifyAppointmentRequest(
   // 6 & 7. Slot masih tersedia & tidak ada konflik jadwal (dokter maupun pasien)
   const existingAppointments = await prisma.appointment.findMany({
     where: {
-      appointmentDate: normalizedDate,
-      status: { in: ['PENDING', 'CONFIRMED', 'CHECKED_IN', 'IN_TREATMENT'] },
+      appointmentDate: { gte: normalizedDate, lte: dayEnd },
+      status: { in: ['PENDING', 'CONFIRMED', 'CHECKED_IN', 'IN_TREATMENT', 'COMPLETED'] },
       OR: [{ doctorId: input.doctorId }, { patientId: input.patientId }],
       ...(input.excludeAppointmentId ? { id: { not: input.excludeAppointmentId } } : {})
     }

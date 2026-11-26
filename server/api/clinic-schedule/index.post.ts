@@ -6,7 +6,10 @@ import { writeAuditLog } from '../../utils/audit'
 import { normalizeClinicScheduleConfig } from '../../../app/utils/clinicScheduleRules'
 
 const scheduleConfigSchema = z.object({
-  slotIntervalMinutes: z.union([z.literal(30), z.literal(60)]).default(30),
+  slotIntervalMinutes: z.union([z.literal(30), z.literal(60)]).optional(),
+  followNationalHolidays: z.boolean().optional(),
+  defaultMonthlyLeaveQuota: z.number().int().min(0).max(31).optional(),
+  doctorLeaveQuotas: z.record(z.string(), z.number().int().min(0).max(31)).optional(),
   weeklyHours: z
     .array(
       z.object({
@@ -17,17 +20,31 @@ const scheduleConfigSchema = z.object({
         closeTime: z.string().regex(/^\d{2}:\d{2}$/)
       })
     )
-    .length(7),
-  specialOverrides: z.record(
-    z.string().regex(/^\d{4}-\d{2}-\d{2}$/),
-    z.object({
-      date: z.string().regex(/^\d{4}-\d{2}-\d{2}$/),
-      type: z.enum(['CLOSED', 'REDUCED_HOURS']),
-      openTime: z.string().regex(/^\d{2}:\d{2}$/).optional(),
-      closeTime: z.string().regex(/^\d{2}:\d{2}$/).optional(),
-      reason: z.string().trim().min(2).max(200)
-    })
-  )
+    .length(7)
+    .optional(),
+  specialOverrides: z
+    .record(
+      z.string().regex(/^\d{4}-\d{2}-\d{2}$/),
+      z.object({
+        date: z.string().regex(/^\d{4}-\d{2}-\d{2}$/),
+        type: z.enum(['CLOSED', 'REDUCED_HOURS']),
+        openTime: z.string().regex(/^\d{2}:\d{2}$/).optional(),
+        closeTime: z.string().regex(/^\d{2}:\d{2}$/).optional(),
+        reason: z.string().trim().min(2).max(200)
+      })
+    )
+    .optional(),
+  specialPracticeDates: z
+    .record(
+      z.string().regex(/^\d{4}-\d{2}-\d{2}$/),
+      z.object({
+        date: z.string().regex(/^\d{4}-\d{2}-\d{2}$/),
+        reason: z.string().trim().min(2).max(200),
+        openTime: z.string().regex(/^\d{2}:\d{2}$/).optional(),
+        closeTime: z.string().regex(/^\d{2}:\d{2}$/).optional()
+      })
+    )
+    .optional()
 })
 
 export default defineEventHandler(async (event) => {
@@ -42,14 +59,20 @@ export default defineEventHandler(async (event) => {
     })
   }
 
-  const normalized = normalizeClinicScheduleConfig(parsed.data)
   const existing = await prisma.clinicSetting.findFirst()
+  const current = normalizeClinicScheduleConfig(existing?.operatingHoursJson)
+
+  const merged = normalizeClinicScheduleConfig({
+    ...current,
+    ...parsed.data,
+    doctorLeaveRequests: current.doctorLeaveRequests
+  })
 
   if (existing) {
     await prisma.clinicSetting.update({
       where: { id: existing.id },
       data: {
-        operatingHoursJson: normalized as unknown as object
+        operatingHoursJson: merged as unknown as object
       }
     })
   } else {
@@ -60,7 +83,7 @@ export default defineEventHandler(async (event) => {
         address: 'Pontianak',
         phone: '0561-700000',
         email: 'halo@luminadental.id',
-        operatingHoursJson: normalized as unknown as object
+        operatingHoursJson: merged as unknown as object
       }
     })
   }
@@ -71,12 +94,12 @@ export default defineEventHandler(async (event) => {
     action: 'UPDATE_CLINIC_SCHEDULE',
     entityType: 'ClinicSetting',
     entityId: existing?.id || 'default',
-    afterJson: normalized
+    afterJson: merged
   })
 
   return {
     success: true,
-    message: 'Pengaturan jadwal praktek dan libur khusus berhasil disimpan.',
-    config: normalized
+    message: 'Pengaturan jadwal praktek dan kuota libur berhasil disimpan.',
+    config: merged
   }
 })

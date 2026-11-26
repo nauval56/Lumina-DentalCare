@@ -1,9 +1,11 @@
 export type ClinicDayStatusType =
   | 'OPEN'
   | 'REDUCED_HOURS'
+  | 'SPECIAL_PRACTICE'
   | 'HOLIDAY_SUNDAY'
   | 'HOLIDAY_NATIONAL'
   | 'SPECIAL_CLOSED'
+  | 'DOCTOR_LEAVE'
   | 'WEEKLY_CLOSED'
 
 export interface WeeklyDaySchedule {
@@ -22,10 +24,36 @@ export interface SpecialScheduleOverride {
   reason: string
 }
 
+export interface SpecialPracticeDate {
+  date: string // YYYY-MM-DD
+  reason: string
+  openTime?: string // HH:mm
+  closeTime?: string // HH:mm
+}
+
+export type DoctorLeaveStatus = 'PENDING' | 'APPROVED' | 'REJECTED'
+
+export interface DoctorLeaveRequestItem {
+  id: string
+  doctorId: string
+  doctorName?: string
+  leaveDate: string // YYYY-MM-DD
+  reason: string
+  status: DoctorLeaveStatus
+  approvedBy?: string | null
+  createdAt: string
+  updatedAt: string
+}
+
 export interface ClinicScheduleConfig {
   slotIntervalMinutes: 30 | 60
+  followNationalHolidays: boolean
+  defaultMonthlyLeaveQuota: number
+  doctorLeaveQuotas: Record<string, number>
   weeklyHours: WeeklyDaySchedule[]
   specialOverrides: Record<string, SpecialScheduleOverride>
+  specialPracticeDates: Record<string, SpecialPracticeDate>
+  doctorLeaveRequests: DoctorLeaveRequestItem[]
 }
 
 export interface EvaluatedClinicDate {
@@ -73,6 +101,9 @@ export const DEFAULT_REGULAR_CLOSE = '20:00'
 export function createDefaultClinicScheduleConfig(): ClinicScheduleConfig {
   return {
     slotIntervalMinutes: 30,
+    followNationalHolidays: true,
+    defaultMonthlyLeaveQuota: 4,
+    doctorLeaveQuotas: {},
     weeklyHours: [
       { dayOfWeek: 0, label: 'Minggu', isOpen: false, openTime: '00:00', closeTime: '00:00' },
       { dayOfWeek: 1, label: 'Senin', isOpen: true, openTime: '09:00', closeTime: '20:00' },
@@ -82,7 +113,9 @@ export function createDefaultClinicScheduleConfig(): ClinicScheduleConfig {
       { dayOfWeek: 5, label: 'Jumat', isOpen: true, openTime: '09:00', closeTime: '20:00' },
       { dayOfWeek: 6, label: 'Sabtu', isOpen: true, openTime: '09:00', closeTime: '17:00' }
     ],
-    specialOverrides: {}
+    specialOverrides: {},
+    specialPracticeDates: {},
+    doctorLeaveRequests: []
   }
 }
 
@@ -92,6 +125,21 @@ export function normalizeClinicScheduleConfig(rawJson: unknown): ClinicScheduleC
 
   const obj = rawJson as Record<string, unknown>
   const slotIntervalMinutes = obj.slotIntervalMinutes === 60 ? 60 : 30
+  const followNationalHolidays =
+    typeof obj.followNationalHolidays === 'boolean' ? obj.followNationalHolidays : true
+  const defaultMonthlyLeaveQuota =
+    typeof obj.defaultMonthlyLeaveQuota === 'number' && obj.defaultMonthlyLeaveQuota >= 0
+      ? Math.min(31, Math.floor(obj.defaultMonthlyLeaveQuota))
+      : 4
+
+  const doctorLeaveQuotas: Record<string, number> = {}
+  if (obj.doctorLeaveQuotas && typeof obj.doctorLeaveQuotas === 'object') {
+    for (const [docId, q] of Object.entries(obj.doctorLeaveQuotas as Record<string, unknown>)) {
+      if (typeof q === 'number' && q >= 0) {
+        doctorLeaveQuotas[docId] = Math.min(31, Math.floor(q))
+      }
+    }
+  }
 
   let weeklyHours = defaults.weeklyHours
   if (Array.isArray(obj.weeklyHours) && obj.weeklyHours.length === 7) {
@@ -125,7 +173,78 @@ export function normalizeClinicScheduleConfig(rawJson: unknown): ClinicScheduleC
     }
   }
 
-  return { slotIntervalMinutes, weeklyHours, specialOverrides }
+  const specialPracticeDates: Record<string, SpecialPracticeDate> = {}
+  if (obj.specialPracticeDates && typeof obj.specialPracticeDates === 'object') {
+    for (const [dateKey, val] of Object.entries(obj.specialPracticeDates as Record<string, unknown>)) {
+      if (!/^\d{4}-\d{2}-\d{2}$/.test(dateKey) || !val || typeof val !== 'object') continue
+      const v = val as Record<string, unknown>
+      specialPracticeDates[dateKey] = {
+        date: dateKey,
+        reason: typeof v.reason === 'string' ? v.reason : 'Hari Praktik Khusus',
+        openTime: typeof v.openTime === 'string' ? v.openTime : '09:00',
+        closeTime: typeof v.closeTime === 'string' ? v.closeTime : '17:00'
+      }
+    }
+  }
+
+  const doctorLeaveRequests: DoctorLeaveRequestItem[] = []
+  if (Array.isArray(obj.doctorLeaveRequests)) {
+    for (const item of obj.doctorLeaveRequests) {
+      if (!item || typeof item !== 'object') continue
+      const r = item as Record<string, unknown>
+      if (typeof r.id !== 'string' || typeof r.doctorId !== 'string' || typeof r.leaveDate !== 'string') {
+        continue
+      }
+      const status: DoctorLeaveStatus =
+        r.status === 'APPROVED' || r.status === 'REJECTED' ? r.status : 'PENDING'
+      doctorLeaveRequests.push({
+        id: r.id,
+        doctorId: r.doctorId,
+        doctorName: typeof r.doctorName === 'string' ? r.doctorName : undefined,
+        leaveDate: r.leaveDate,
+        reason: typeof r.reason === 'string' ? r.reason : '-',
+        status,
+        approvedBy: typeof r.approvedBy === 'string' ? r.approvedBy : null,
+        createdAt: typeof r.createdAt === 'string' ? r.createdAt : new Date().toISOString(),
+        updatedAt: typeof r.updatedAt === 'string' ? r.updatedAt : new Date().toISOString()
+      })
+    }
+  }
+
+  return {
+    slotIntervalMinutes,
+    followNationalHolidays,
+    defaultMonthlyLeaveQuota,
+    doctorLeaveQuotas,
+    weeklyHours,
+    specialOverrides,
+    specialPracticeDates,
+    doctorLeaveRequests
+  }
+}
+
+export function evaluateDoctorLeaveQuota(
+  doctorId: string,
+  monthPrefix: string, // YYYY-MM
+  config: ClinicScheduleConfig
+) {
+  const quota = config.doctorLeaveQuotas[doctorId] ?? config.defaultMonthlyLeaveQuota ?? 4
+  const monthLeaves = config.doctorLeaveRequests.filter(
+    (r) => r.doctorId === doctorId && r.leaveDate.startsWith(monthPrefix)
+  )
+  const approvedCount = monthLeaves.filter((r) => r.status === 'APPROVED').length
+  const pendingCount = monthLeaves.filter((r) => r.status === 'PENDING').length
+  const remaining = Math.max(0, quota - approvedCount)
+  const canRequest = approvedCount + pendingCount < quota
+  return {
+    doctorId,
+    monthPrefix,
+    quota,
+    used: approvedCount,
+    pending: pendingCount,
+    remaining,
+    canRequest
+  }
 }
 
 function toMinutes(timeStr: string): number {
@@ -137,10 +256,51 @@ function toMinutes(timeStr: string): number {
 export function evaluateClinicDateStatus(
   dateStr: string,
   config: ClinicScheduleConfig,
-  dbHolidays: Record<string, string> = {}
+  dbHolidays: Record<string, string> = {},
+  doctorId?: string
 ): EvaluatedClinicDate {
   const d = new Date(`${dateStr}T00:00:00.000Z`)
   const dayOfWeek = Number.isNaN(d.getTime()) ? 1 : d.getUTCDay()
+
+  // 0. Hari Praktik Khusus: Admin mengaktifkan praktik pada tanggal libur tertentu
+  const specialPractice = config.specialPracticeDates[dateStr]
+  if (specialPractice) {
+    // Tetap cek jika dokter tertentu sedang cuti APPROVED
+    if (doctorId) {
+      const approvedLeave = config.doctorLeaveRequests.find(
+        (r) => r.doctorId === doctorId && r.leaveDate === dateStr && r.status === 'APPROVED'
+      )
+      if (approvedLeave) {
+        return {
+          date: dateStr,
+          dayOfWeek,
+          status: 'DOCTOR_LEAVE',
+          isOpen: false,
+          isHoliday: false,
+          isSunday: false,
+          isReducedHours: false,
+          badge: 'Libur Dokter',
+          reason: `Dokter sedang libur/cuti (${approvedLeave.reason})`,
+          openTime: null,
+          closeTime: null
+        }
+      }
+    }
+
+    return {
+      date: dateStr,
+      dayOfWeek,
+      status: 'SPECIAL_PRACTICE',
+      isOpen: true,
+      isHoliday: false,
+      isSunday: dayOfWeek === 0,
+      isReducedHours: false,
+      badge: 'Hari Praktik Khusus',
+      reason: specialPractice.reason || 'Hari Praktik Khusus diaktifkan Admin',
+      openTime: specialPractice.openTime || '09:00',
+      closeTime: specialPractice.closeTime || '17:00'
+    }
+  }
 
   // 1. Aturan Libur Tetap: Setiap hari Minggu otomatis Libur
   if (dayOfWeek === 0) {
@@ -160,7 +320,9 @@ export function evaluateClinicDateStatus(
   }
 
   // 2. Tanggal Merah / Libur Nasional Pemerintah Indonesia & Libur DB
-  const nationalHolidayName = dbHolidays[dateStr] || INDONESIA_NATIONAL_HOLIDAYS[dateStr]
+  const dbHolidayName = dbHolidays[dateStr]
+  const nationalHolidayName =
+    config.followNationalHolidays !== false ? INDONESIA_NATIONAL_HOLIDAYS[dateStr] : undefined
   if (nationalHolidayName) {
     return {
       date: dateStr,
@@ -170,8 +332,23 @@ export function evaluateClinicDateStatus(
       isHoliday: true,
       isSunday: false,
       isReducedHours: false,
-      badge: 'Libur',
+      badge: 'Libur Nasional',
       reason: `Hari Libur Nasional: ${nationalHolidayName}`,
+      openTime: null,
+      closeTime: null
+    }
+  }
+  if (dbHolidayName) {
+    return {
+      date: dateStr,
+      dayOfWeek,
+      status: 'SPECIAL_CLOSED',
+      isOpen: false,
+      isHoliday: true,
+      isSunday: false,
+      isReducedHours: false,
+      badge: 'Libur Klinik',
+      reason: `Libur Klinik: ${dbHolidayName}`,
       openTime: null,
       closeTime: null
     }
@@ -188,10 +365,32 @@ export function evaluateClinicDateStatus(
       isHoliday: false,
       isSunday: false,
       isReducedHours: false,
-      badge: 'Klinik Tutup',
+      badge: 'Libur Klinik',
       reason: override.reason || 'Libur Khusus / Cuti Dokter',
       openTime: null,
       closeTime: null
+    }
+  }
+
+  // 4. Cek Cuti / Libur Dokter yang sudah Approved
+  if (doctorId) {
+    const approvedLeave = config.doctorLeaveRequests.find(
+      (r) => r.doctorId === doctorId && r.leaveDate === dateStr && r.status === 'APPROVED'
+    )
+    if (approvedLeave) {
+      return {
+        date: dateStr,
+        dayOfWeek,
+        status: 'DOCTOR_LEAVE',
+        isOpen: false,
+        isHoliday: false,
+        isSunday: false,
+        isReducedHours: false,
+        badge: 'Libur Dokter',
+        reason: `Dokter sedang libur/cuti (${approvedLeave.reason})`,
+        openTime: null,
+        closeTime: null
+      }
     }
   }
 
@@ -205,7 +404,7 @@ export function evaluateClinicDateStatus(
       isHoliday: false,
       isSunday: false,
       isReducedHours: false,
-      badge: 'Klinik Tutup',
+      badge: 'Libur Klinik',
       reason: 'Klinik tidak beroperasi pada hari ini',
       openTime: null,
       closeTime: null
@@ -257,7 +456,7 @@ export function evaluateClinicDateStatus(
     isHoliday: false,
     isSunday: false,
     isReducedHours: false,
-    badge: 'Buka Normal',
+    badge: 'Hari Kerja',
     reason: `Operasional reguler (${dayRule.openTime} - ${dayRule.closeTime} WIB)`,
     openTime: dayRule.openTime,
     closeTime: dayRule.closeTime

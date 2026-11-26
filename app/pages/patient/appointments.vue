@@ -130,6 +130,7 @@ function goToStep(step: number) {
       toast.error('Pilih Dokter', 'Silakan pilih dokter gigi terlebih dahulu.')
       return
     }
+    loadSlots()
   }
   if (step === 3) {
     if (!bookingForm.appointmentDate) {
@@ -163,7 +164,7 @@ async function confirmAppointment() {
     bookingForm.startTime = ''
     bookingForm.chiefComplaint = ''
     bookingForm.notes = ''
-    await refreshAppointments()
+    await Promise.all([refreshAppointments(), loadSlots()])
   } catch (err: unknown) {
     toast.error(
       'Verifikasi Booking Gagal',

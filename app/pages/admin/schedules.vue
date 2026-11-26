@@ -1,6 +1,7 @@
 <script setup lang="ts">
 import {
   getDayNameId,
+  formatDateId,
   formatDayAndDateId,
   getDateStringForDayOfWeek,
   formatScheduleDayAndDate
@@ -8,11 +9,130 @@ import {
 
 definePageMeta({ layout: 'portal' })
 
-const [{ data: schedulesData, refresh }, { data: doctorsData }] = await Promise.all([
+const [
+  { data: schedulesData, refresh },
+  { data: doctorsData },
+  { data: clinicScheduleRes, refresh: refreshClinicSchedule },
+  { data: leavesRes, refresh: refreshLeaves },
+  { data: appointmentsRes }
+] = await Promise.all([
   useFetch('/api/schedules'),
-  useFetch('/api/doctors')
+  useFetch('/api/doctors'),
+  useFetch('/api/clinic-schedule'),
+  useFetch('/api/doctor-leaves'),
+  useFetch('/api/appointments')
 ])
 const toast = useClinicToast()
+
+const adminScheduleTab = ref<'CALENDAR' | 'LEAVES' | 'RULES'>('CALENDAR')
+const followNationalHolidays = ref(true)
+const defaultMonthlyQuota = ref(4)
+const specialPracticeForm = reactive({
+  date: new Date(Date.now() + 86400000).toISOString().slice(0, 10),
+  openTime: '09:00',
+  closeTime: '17:00',
+  reason: ''
+})
+
+watch(
+  () => clinicScheduleRes.value?.config,
+  (cfg) => {
+    if (!cfg) return
+    followNationalHolidays.value = cfg.followNationalHolidays !== false
+    defaultMonthlyQuota.value = cfg.defaultMonthlyLeaveQuota ?? 4
+  },
+  { immediate: true }
+)
+
+async function savePolicySettings() {
+  try {
+    const current = clinicScheduleRes.value?.config
+    await $fetch('/api/clinic-schedule', {
+      method: 'POST',
+      body: {
+        slotIntervalMinutes: current?.slotIntervalMinutes || 30,
+        followNationalHolidays: followNationalHolidays.value,
+        defaultMonthlyLeaveQuota: Number(defaultMonthlyQuota.value),
+        doctorLeaveQuotas: current?.doctorLeaveQuotas || {},
+        weeklyHours: current?.weeklyHours,
+        specialOverrides: current?.specialOverrides || {},
+        specialPracticeDates: current?.specialPracticeDates || {}
+      }
+    })
+    toast.success('Kebijakan Disimpan', 'Pengaturan libur nasional otomatis & kuota cuti dokter diperbarui.')
+    await Promise.all([refreshClinicSchedule(), refreshLeaves()])
+  } catch (err: unknown) {
+    toast.error('Gagal Menyimpan', (err as { data?: { statusMessage?: string } })?.data?.statusMessage || 'Terjadi kesalahan.')
+  }
+}
+
+async function addSpecialPracticeDate() {
+  if (!specialPracticeForm.date) return
+  try {
+    const current = clinicScheduleRes.value?.config
+    const nextSpecial = { ...(current?.specialPracticeDates || {}) }
+    nextSpecial[specialPracticeForm.date] = {
+      date: specialPracticeForm.date,
+      openTime: specialPracticeForm.openTime,
+      closeTime: specialPracticeForm.closeTime,
+      reason: specialPracticeForm.reason.trim() || 'Hari Praktik Khusus (Diaktifkan Admin)'
+    }
+    await $fetch('/api/clinic-schedule', {
+      method: 'POST',
+      body: {
+        ...current,
+        specialPracticeDates: nextSpecial
+      }
+    })
+    toast.success('Hari Praktik Khusus Ditambahkan', `Tanggal ${specialPracticeForm.date} aktif untuk praktik.`)
+    specialPracticeForm.reason = ''
+    await refreshClinicSchedule()
+  } catch (err: unknown) {
+    toast.error('Gagal Menambah', (err as { data?: { statusMessage?: string } })?.data?.statusMessage || 'Terjadi kesalahan.')
+  }
+}
+
+async function removeSpecialPracticeDate(dateKey: string) {
+  const current = clinicScheduleRes.value?.config
+  const nextSpecial = { ...(current?.specialPracticeDates || {}) }
+  delete nextSpecial[dateKey]
+  await $fetch('/api/clinic-schedule', {
+    method: 'POST',
+    body: {
+      ...current,
+      specialPracticeDates: nextSpecial
+    }
+  })
+  toast.info('Dihapus', 'Hari praktik khusus dihapus.')
+  await refreshClinicSchedule()
+}
+
+async function updateDoctorCustomQuota(doctorId: string, quotaVal: number) {
+  const current = clinicScheduleRes.value?.config
+  const nextQuotas = { ...(current?.doctorLeaveQuotas || {}), [doctorId]: Math.max(0, Math.min(31, Number(quotaVal))) }
+  await $fetch('/api/clinic-schedule', {
+    method: 'POST',
+    body: {
+      ...current,
+      doctorLeaveQuotas: nextQuotas
+    }
+  })
+  toast.success('Kuota Diperbarui', 'Kuota libur bulanan dokter berhasil disesuaikan.')
+  await Promise.all([refreshClinicSchedule(), refreshLeaves()])
+}
+
+async function reviewLeaveRequest(id: string, status: 'APPROVED' | 'REJECTED') {
+  try {
+    const res = await $fetch<{ message: string }>(`/api/doctor-leaves/${id}`, {
+      method: 'PATCH',
+      body: { status }
+    })
+    toast.success(status === 'APPROVED' ? 'Cuti Disetujui' : 'Cuti Ditolak', res.message)
+    await Promise.all([refreshLeaves(), refreshClinicSchedule()])
+  } catch (err: unknown) {
+    toast.error('Gagal Memproses', (err as { data?: { statusMessage?: string } })?.data?.statusMessage || 'Kuota cuti penuh.')
+  }
+}
 
 const formMode = ref<'WEEKLY_OFF_DAY' | 'SINGLE_DAY'>('WEEKLY_OFF_DAY')
 
@@ -279,55 +399,270 @@ async function removeItem(id: string, type?: string) {
 <template>
   <!-- Figma 31. Admin CRUD Jadwal & Hari Libur Dokter (/admin/schedules) -->
   <div class="flex flex-col gap-[22px]">
-    <div class="bg-[#EAF5F6] border border-[#D8E6E8] rounded-lg p-[26px] flex flex-col gap-1">
-      <span class="text-[11px] font-bold uppercase text-[#137A7F]">
-        ADMIN · JADWAL PRAKTIK, TANGGAL &amp; HARI LIBUR DOKTER (CRUD)
-      </span>
-      <h1 class="font-heading font-bold text-[24px] text-[#0B253A]">
-        Manajemen Jadwal Praktik, Tanggal &amp; Hari Libur Dokter
-      </h1>
-    </div>
+    <div class="bg-[#EAF5F6] border border-[#D8E6E8] rounded-lg p-[26px] flex flex-col lg:flex-row lg:items-center justify-between gap-4">
+      <div class="flex flex-col gap-1">
+        <span class="text-[11px] font-bold uppercase text-[#137A7F]">
+          ADMIN · KALENDER DOKTER, KUOTA LIBUR &amp; JADWAL PRAKTIK FLEKSIBEL
+        </span>
+        <h1 class="font-heading font-bold text-[24px] text-[#0B253A]">
+          Manajemen Jadwal Praktik, Tanggal &amp; Hari Libur Dokter
+        </h1>
+      </div>
 
-    <!-- Kartu Ringkasan 1 Hari & Tanggal Libur per Dokter -->
-    <div class="grid grid-cols-1 md:grid-cols-3 gap-4">
-      <div
-        v-for="item in doctorWeeklySummary"
-        :key="item.doctor.id"
-        class="lumina-card p-5 flex flex-col justify-between gap-3"
-      >
-        <div class="space-y-1">
-          <span class="text-[11px] font-bold uppercase tracking-wider text-teal-600">
-            {{ item.doctor.specialization }}
-          </span>
-          <h3 class="font-heading font-bold text-sm text-[#0B253A]">
-            {{ item.doctor.titlePrefix }} {{ item.doctor.fullName }}
-          </h3>
-          <div class="pt-1 space-y-1.5 text-xs">
-            <div class="flex items-center justify-between">
-              <span class="text-[#475569]">Jam Praktik:</span>
-              <strong class="text-[#137A7F]">{{ item.startTime }} - {{ item.endTime }} WIB</strong>
-            </div>
-            <div class="flex flex-col gap-1">
-              <span class="text-[#475569]">1 Hari & Tanggal Libur:</span>
-              <span class="px-2.5 py-1 rounded-lg bg-rose-50 text-rose-700 border border-rose-200 font-bold text-[11px]">
-                Libur: {{ item.offDayDateLabel }}
-              </span>
-            </div>
-          </div>
-        </div>
+      <div class="inline-flex flex-wrap rounded-md bg-white border border-[#D8E6E8] p-1 gap-1">
         <button
           type="button"
-          class="w-full py-2 rounded-lg border border-[#D8E6E8] bg-[#EAF5F6]/70 hover:bg-sky-100 text-[#137A7F] text-xs font-semibold transition-colors"
-          @click="selectDoctorForWeeklyOffDay(item)"
+          class="px-3.5 py-2 min-h-11 rounded-md text-xs font-semibold transition-colors"
+          :class="adminScheduleTab === 'CALENDAR' ? 'bg-[#137A7F] text-white' : 'text-[#0B253A] hover:bg-[#EAF5F6]'"
+          @click="adminScheduleTab = 'CALENDAR'"
         >
-          Ubah Tanggal & Hari Libur + Jam
+          Kalender Dokter
+        </button>
+        <button
+          type="button"
+          class="px-3.5 py-2 min-h-11 rounded-md text-xs font-semibold transition-colors"
+          :class="adminScheduleTab === 'LEAVES' ? 'bg-[#137A7F] text-white' : 'text-[#0B253A] hover:bg-[#EAF5F6]'"
+          @click="adminScheduleTab = 'LEAVES'"
+        >
+          Kuota &amp; Pengajuan Libur ({{ (leavesRes?.requests || []).filter((r: any) => r.status === 'PENDING').length }})
+        </button>
+        <button
+          type="button"
+          class="px-3.5 py-2 min-h-11 rounded-md text-xs font-semibold transition-colors"
+          :class="adminScheduleTab === 'RULES' ? 'bg-[#137A7F] text-white' : 'text-[#0B253A] hover:bg-[#EAF5F6]'"
+          @click="adminScheduleTab = 'RULES'"
+        >
+          Libur Nasional &amp; Praktik Khusus
         </button>
       </div>
     </div>
 
-    <div class="grid grid-cols-1 lg:grid-cols-12 gap-6">
-      <!-- Kolom Kiri: Pengaturan Jadwal Dokter (Pilih Tanggal & Hari Libur + Jam Mulai & Selesai) -->
-      <div class="lg:col-span-7 lumina-card p-6 space-y-4">
+    <!-- Kalender Dokter (Bulanan / Mingguan / Harian) -->
+    <AdminAdminDoctorCalendar
+      v-if="adminScheduleTab === 'CALENDAR'"
+      :doctors="doctorsData?.items || []"
+      :schedules="schedulesData?.items || []"
+      :appointments="appointmentsRes?.items || []"
+      :config="clinicScheduleRes?.config"
+      :holidays="clinicScheduleRes?.holidays"
+    />
+
+    <!-- Manajemen Kuota & Persetujuan Pengajuan Libur Dokter -->
+    <div v-else-if="adminScheduleTab === 'LEAVES'" class="grid grid-cols-1 lg:grid-cols-12 gap-6">
+      <div class="lg:col-span-5 bg-white border border-[#D8E6E8] rounded-lg p-6 space-y-4">
+        <div class="pb-3 border-b border-[#D8E6E8]">
+          <span class="text-[11px] font-bold uppercase text-[#137A7F]">KUOTA BULANAN DOKTER</span>
+          <h2 class="font-heading font-bold text-[18px] text-[#0B253A]">
+            Atur Kuota Libur per Bulan ({{ leavesRes?.monthPrefix }})
+          </h2>
+        </div>
+
+        <div class="p-3.5 rounded-md bg-[#F4F9F9] border border-[#D8E6E8] flex items-center justify-between gap-2 text-xs">
+          <span class="font-semibold text-[#0B253A]">Kuota Default Semua Dokter:</span>
+          <div class="flex items-center gap-2">
+            <input
+              v-model.number="defaultMonthlyQuota"
+              type="number"
+              min="0"
+              max="31"
+              class="w-20 px-2.5 py-1.5 min-h-11 rounded-md border border-[#D8E6E8] bg-white font-bold text-center"
+            >
+            <button
+              type="button"
+              class="px-3 py-2 min-h-11 rounded-md bg-[#137A7F] text-white font-semibold"
+              @click="savePolicySettings"
+            >
+              Simpan
+            </button>
+          </div>
+        </div>
+
+        <div class="space-y-2.5">
+          <div
+            v-for="q in leavesRes?.quotaSummaries || []"
+            :key="q.doctorId"
+            class="p-3.5 rounded-md border border-[#D8E6E8] bg-white flex flex-wrap items-center justify-between gap-2 text-xs"
+          >
+            <div>
+              <strong class="text-[#0B253A] block">{{ q.doctorName }}</strong>
+              <span class="text-[#475569]">
+                Terpakai: <strong class="text-[#BE123C]">{{ q.used }}</strong> · Sisa: <strong class="text-[#137A7F]">{{ q.remaining }}</strong> dari {{ q.quota }} hari/bln
+              </span>
+            </div>
+            <div class="flex items-center gap-1.5">
+              <button
+                type="button"
+                class="px-2.5 py-1.5 min-h-11 rounded-md border border-[#D8E6E8] bg-[#F4F9F9] font-bold"
+                @click="updateDoctorCustomQuota(q.doctorId, q.quota - 1)"
+              >
+                -1
+              </button>
+              <span class="px-2 font-bold text-[#0B253A]">{{ q.quota }}</span>
+              <button
+                type="button"
+                class="px-2.5 py-1.5 min-h-11 rounded-md border border-[#D8E6E8] bg-[#F4F9F9] font-bold"
+                @click="updateDoctorCustomQuota(q.doctorId, q.quota + 1)"
+              >
+                +1
+              </button>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <div class="lg:col-span-7 bg-white border border-[#D8E6E8] rounded-lg p-6 space-y-4">
+        <div class="pb-3 border-b border-[#D8E6E8]">
+          <span class="text-[11px] font-bold uppercase text-[#137A7F]">PERSETUJUAN CUTI DOKTER</span>
+          <h2 class="font-heading font-bold text-[18px] text-[#0B253A]">
+            Daftar Pengajuan Hari Libur Dokter
+          </h2>
+        </div>
+
+        <div v-if="(leavesRes?.requests || []).length" class="space-y-2.5">
+          <div
+            v-for="req in leavesRes?.requests || []"
+            :key="req.id"
+            class="p-4 rounded-md border border-[#D8E6E8] bg-[#F4F9F9] flex flex-wrap items-center justify-between gap-3 text-xs"
+          >
+            <div>
+              <div class="flex flex-wrap items-center gap-2">
+                <strong class="text-sm text-[#0B253A]">{{ req.doctorName }}</strong>
+                <span class="px-2.5 py-0.5 rounded-md bg-white border border-[#D8E6E8] font-bold text-[#137A7F]">
+                  {{ formatDateId(req.leaveDate) }}
+                </span>
+                <span
+                  class="px-2.5 py-0.5 rounded-md font-bold text-[10px]"
+                  :class="
+                    req.status === 'APPROVED'
+                      ? 'bg-emerald-100 text-emerald-800'
+                      : req.status === 'REJECTED'
+                        ? 'bg-rose-100 text-[#BE123C]'
+                        : 'bg-amber-100 text-[#B45309]'
+                  "
+                >
+                  {{ req.status }}
+                </span>
+              </div>
+              <p class="text-[#475569] mt-1">{{ req.reason }}</p>
+            </div>
+
+            <div v-if="req.status === 'PENDING'" class="flex items-center gap-2">
+              <button
+                type="button"
+                class="px-3.5 py-2 min-h-11 rounded-md bg-emerald-700 hover:bg-emerald-800 text-white font-semibold"
+                @click="reviewLeaveRequest(req.id, 'APPROVED')"
+              >
+                Setujui
+              </button>
+              <button
+                type="button"
+                class="px-3.5 py-2 min-h-11 rounded-md bg-rose-50 hover:bg-rose-100 text-[#BE123C] font-semibold"
+                @click="reviewLeaveRequest(req.id, 'REJECTED')"
+              >
+                Tolak
+              </button>
+            </div>
+          </div>
+        </div>
+        <p v-else class="text-xs text-[#475569]">
+          Belum ada pengajuan hari libur dari dokter.
+        </p>
+      </div>
+    </div>
+
+    <!-- Pengaturan Libur Nasional Otomatis & Hari Praktik Khusus -->
+    <div v-else-if="adminScheduleTab === 'RULES'" class="grid grid-cols-1 lg:grid-cols-2 gap-6">
+      <div class="bg-white border border-[#D8E6E8] rounded-lg p-6 space-y-4">
+        <div class="pb-3 border-b border-[#D8E6E8]">
+          <span class="text-[11px] font-bold uppercase text-[#137A7F]">KALENDER PEMERINTAH INDONESIA</span>
+          <h2 class="font-heading font-bold text-[18px] text-[#0B253A]">
+            Aturan Hari Libur Nasional Otomatis
+          </h2>
+        </div>
+
+        <div class="p-4 rounded-md bg-[#EAF5F6] border border-[#D8E6E8] flex items-center justify-between gap-3 text-xs">
+          <div>
+            <strong class="text-sm text-[#0B253A] block">Ikuti Kalender Libur Nasional Otomatis</strong>
+            <span class="text-[#475569]">
+              Jika aktif, seluruh tanggal merah nasional otomatis menutup slot booking pasien.
+            </span>
+          </div>
+          <button
+            type="button"
+            class="px-4 py-2 min-h-11 rounded-md text-xs font-bold shrink-0"
+            :class="followNationalHolidays ? 'bg-[#137A7F] text-white' : 'bg-white border border-[#D8E6E8] text-[#0B253A]'"
+            @click="followNationalHolidays = !followNationalHolidays; savePolicySettings()"
+          >
+            {{ followNationalHolidays ? 'Aktif (Otomatis)' : 'Nonaktif' }}
+          </button>
+        </div>
+      </div>
+
+      <div class="bg-white border border-[#D8E6E8] rounded-lg p-6 space-y-4">
+        <div class="pb-3 border-b border-[#D8E6E8]">
+          <span class="text-[11px] font-bold uppercase text-[#137A7F]">HARI PRAKTIK KHUSUS</span>
+          <h2 class="font-heading font-bold text-[18px] text-[#0B253A]">
+            Aktifkan Praktik pada Hari Libur Tertentu
+          </h2>
+        </div>
+
+        <div class="grid grid-cols-1 sm:grid-cols-3 gap-2 text-xs">
+          <input
+            v-model="specialPracticeForm.date"
+            type="date"
+            class="px-3 py-2 min-h-11 rounded-md border border-[#D8E6E8] bg-white"
+          >
+          <input
+            v-model="specialPracticeForm.openTime"
+            type="time"
+            class="px-3 py-2 min-h-11 rounded-md border border-[#D8E6E8] bg-white"
+          >
+          <input
+            v-model="specialPracticeForm.closeTime"
+            type="time"
+            class="px-3 py-2 min-h-11 rounded-md border border-[#D8E6E8] bg-white"
+          >
+        </div>
+        <div class="flex gap-2 text-xs">
+          <input
+            v-model="specialPracticeForm.reason"
+            type="text"
+            placeholder="Keterangan (misal: Layanan Siaga Hari Libur)"
+            class="flex-1 px-3 py-2 min-h-11 rounded-md border border-[#D8E6E8] bg-white"
+          >
+          <button
+            type="button"
+            class="px-4 py-2 min-h-11 rounded-md bg-[#137A7F] hover:bg-[#0E5F63] text-white font-semibold shrink-0"
+            @click="addSpecialPracticeDate"
+          >
+            Aktifkan Tanggal
+          </button>
+        </div>
+
+        <div class="space-y-2 text-xs">
+          <div
+            v-for="(sp, key) in clinicScheduleRes?.config?.specialPracticeDates || {}"
+            :key="key"
+            class="p-3 rounded-md bg-emerald-50 border border-emerald-200 flex items-center justify-between gap-2"
+          >
+            <div>
+              <strong class="text-emerald-900">{{ formatDateId(sp.date) }} · {{ sp.openTime }} - {{ sp.closeTime }} WIB</strong>
+              <span class="block text-emerald-700">{{ sp.reason }}</span>
+            </div>
+            <button
+              type="button"
+              class="px-3 py-1.5 rounded-md bg-white border border-emerald-200 text-[#BE123C] font-semibold"
+              @click="removeSpecialPracticeDate(String(key))"
+            >
+              Hapus
+            </button>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <!-- Pengaturan Jadwal Praktik Fleksibel Dokter -->
+    <div class="lumina-card p-6 space-y-4">
         <div class="flex flex-wrap items-center justify-between gap-2 pb-3 border-b border-[#D8E6E8]">
           <h2 class="font-heading font-bold text-base text-[#0B253A]">
             Atur Jadwal Praktik & Pilihan 1 Tanggal / Hari Libur Dokter
@@ -544,125 +879,6 @@ async function removeItem(id: string, type?: string) {
         </form>
       </div>
 
-      <!-- Kolom Kanan: Form Hari Libur Tanggal Spesifik / Cuti Dokter + Jam Mulai & Selesai -->
-      <form class="lg:col-span-5 lumina-card p-6 space-y-4" @submit.prevent="saveHoliday">
-        <div class="flex items-center justify-between">
-          <h2 class="font-heading font-bold text-base text-[#0B253A]">
-            {{ editingHolidayId ? 'Edit Tanggal & Hari Libur' : 'Tetapkan Tanggal & Hari Libur / Izin Dokter' }}
-          </h2>
-          <button
-            v-if="editingHolidayId"
-            type="button"
-            class="text-xs font-semibold text-[#475569] hover:text-[#0B253A]"
-            @click="resetHolidayForm"
-          >
-            Batal Edit ✕
-          </button>
-        </div>
-
-        <div class="space-y-3">
-          <div class="grid grid-cols-1 sm:grid-cols-2 gap-3">
-            <div>
-              <label class="block text-xs font-semibold text-slate-700 mb-1">
-                Pilih Dokter / Klinik
-              </label>
-              <select
-                v-model="holidayForm.doctorId"
-                class="w-full px-3.5 py-2 rounded-md border border-[#D8E6E8] text-sm bg-white"
-              >
-                <option value="">Seluruh Klinik</option>
-                <option v-for="d in doctorsData?.items || []" :key="d.id" :value="d.id">
-                  {{ d.titlePrefix }} {{ d.fullName }}
-                </option>
-              </select>
-            </div>
-            <div>
-              <label class="block text-xs font-semibold text-slate-700 mb-1">Tanggal & Hari Libur *</label>
-              <input
-                v-model="holidayForm.date"
-                type="date"
-                required
-                class="w-full px-3.5 py-2 rounded-md border border-[#D8E6E8] text-sm"
-              >
-              <span v-if="holidayForm.date" class="block text-[11px] font-semibold text-rose-700 mt-1">
-                {{ formatDayAndDateId(holidayForm.date) }}
-              </span>
-            </div>
-          </div>
-
-          <div class="grid grid-cols-2 gap-3">
-            <div>
-              <label class="block text-xs font-semibold text-slate-700 mb-1">Jam Mulai Libur *</label>
-              <input
-                v-model="holidayForm.startTime"
-                type="time"
-                required
-                class="w-full px-3.5 py-2 rounded-md border border-[#D8E6E8] text-sm"
-              >
-            </div>
-            <div>
-              <label class="block text-xs font-semibold text-slate-700 mb-1">Jam Selesai Libur *</label>
-              <input
-                v-model="holidayForm.endTime"
-                type="time"
-                required
-                class="w-full px-3.5 py-2 rounded-md border border-[#D8E6E8] text-sm"
-              >
-            </div>
-          </div>
-
-          <div>
-            <label class="block text-xs font-semibold text-slate-700 mb-1">Keterangan Hari Libur *</label>
-            <input
-              v-model="holidayForm.name"
-              type="text"
-              required
-              placeholder="Contoh: Cuti Dokter / Libur Nasional"
-              class="w-full px-3.5 py-2 rounded-md border border-[#D8E6E8] text-sm"
-            >
-          </div>
-
-          <button
-            type="submit"
-            class="w-full py-2.5 rounded-md bg-[#137A7F] hover:bg-[#0E5F63] text-white text-xs font-semibold"
-          >
-            {{ editingHolidayId ? 'Simpan Perubahan Tanggal & Hari Libur' : '+ Tambah Tanggal & Hari Libur' }}
-          </button>
-        </div>
-
-        <div v-if="(schedulesData?.holidays || []).length" class="pt-3 border-t border-[#D8E6E8] space-y-2">
-          <div
-            v-for="h in schedulesData?.holidays || []"
-            :key="h.id"
-            class="flex items-center justify-between gap-2 text-xs p-2.5 rounded-lg bg-rose-50 text-rose-900 border border-rose-200"
-          >
-            <div>
-              <div><strong>{{ formatDayAndDateId(h.date) }}</strong> · {{ h.name }}</div>
-              <div v-if="h.description" class="text-[11px] text-rose-700 mt-0.5">
-                {{ h.description }}
-              </div>
-            </div>
-            <div class="inline-flex items-center gap-1.5 shrink-0">
-              <button
-                type="button"
-                class="px-2 py-1 rounded-md bg-white border border-rose-200 text-slate-700 font-semibold"
-                @click="loadHolidayToEdit(h)"
-              >
-                Edit
-              </button>
-              <button
-                type="button"
-                class="px-2 py-1 rounded-md bg-white border border-rose-200 text-rose-600 font-semibold"
-                @click="removeItem(h.id, 'holiday')"
-              >
-                Hapus
-              </button>
-            </div>
-          </div>
-        </div>
-      </form>
-    </div>
-
     <!-- Tabel Jadwal Praktik, Tanggal & Hari Libur Dokter -->
     <div class="lumina-card overflow-x-auto">
       <table class="w-full text-left border-collapse text-sm">
@@ -691,14 +907,14 @@ async function removeItem(id: string, type?: string) {
             </td>
             <td class="py-3 px-4">
               <span
-                class="px-2.5 py-1 rounded-md text-xs font-bold"
+                class="inline-flex items-center whitespace-nowrap px-3 py-1 rounded-md text-xs font-bold"
                 :class="
                   sch.isActive
                     ? 'bg-emerald-50 text-emerald-700 border border-emerald-200'
                     : 'bg-rose-50 text-rose-700 border border-rose-200'
                 "
               >
-                {{ sch.isActive ? 'Praktik Aktif' : 'HARI LIBUR DOKTER' }}
+                {{ sch.isActive ? 'Praktik Aktif' : 'Hari Libur Dokter' }}
               </span>
             </td>
             <td class="py-3 px-4 text-xs font-semibold">

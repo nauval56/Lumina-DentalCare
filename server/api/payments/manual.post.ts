@@ -23,6 +23,12 @@ export default defineEventHandler(async (event) => {
   }
 
   const d = parsed.data
+  if (actor.role === 'RECEPTIONIST' && d.method !== 'CASH') {
+    throw createError({
+      statusCode: 403,
+      statusMessage: 'Resepsionis hanya diperbolehkan mencatat pembayaran tunai (Cash) langsung di meja kasir.'
+    })
+  }
   const invoice = await prisma.invoice.findUnique({
     where: { id: d.invoiceId },
     include: { patient: true }
@@ -69,6 +75,23 @@ export default defineEventHandler(async (event) => {
         status: nextStatus
       }
     })
+
+    if (nextStatus === 'PAID' && invoice.medicalRecordId) {
+      const mr = await tx.medicalRecord.findUnique({
+        where: { id: invoice.medicalRecordId },
+        select: { appointmentId: true }
+      })
+      if (mr?.appointmentId) {
+        await tx.appointment.update({
+          where: { id: mr.appointmentId },
+          data: { status: 'COMPLETED' }
+        })
+        await tx.queue.updateMany({
+          where: { appointmentId: mr.appointmentId },
+          data: { status: 'COMPLETED', completedAt: new Date() }
+        })
+      }
+    }
 
     if (invoice.patient.userId) {
       await tx.notification.create({
