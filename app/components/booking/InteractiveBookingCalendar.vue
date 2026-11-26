@@ -11,6 +11,7 @@ const props = defineProps<{
   config?: ClinicScheduleConfig | null
   holidays?: Record<string, string>
   minDate?: string
+  patientAppointments?: Array<{ appointmentDate: string; status: string; startTime?: string }>
 }>()
 
 const emit = defineEmits<{
@@ -89,6 +90,30 @@ const calendarCells = computed<CalendarCell[]>(() => {
   return cells
 })
 
+const patientDateStatusMap = computed(() => {
+  const map: Record<string, { status: 'COMPLETED' | 'BOOKED'; label: string; reason: string }> = {}
+  for (const appt of props.patientAppointments || []) {
+    if (!appt.appointmentDate || appt.status === 'CANCELLED') continue
+    const dateKey = String(appt.appointmentDate).slice(0, 10)
+    if (appt.status === 'COMPLETED') {
+      if (!map[dateKey]) {
+        map[dateKey] = {
+          status: 'COMPLETED',
+          label: 'Selesai',
+          reason: `Kunjungan Anda pada tanggal ini sudah selesai (${appt.startTime || '-'} WIB).`
+        }
+      }
+    } else if (['PENDING', 'CONFIRMED', 'CHECKED_IN', 'IN_TREATMENT'].includes(appt.status)) {
+      map[dateKey] = {
+        status: 'BOOKED',
+        label: 'Terjadwal',
+        reason: `Anda memiliki jadwal kunjungan aktif pada tanggal ini (${appt.startTime || '-'} WIB).`
+      }
+    }
+  }
+  return map
+})
+
 const selectedEvaluated = computed(() => {
   if (!props.modelValue) return null
   return evaluateClinicDateStatus(props.modelValue, effectiveConfig.value, effectiveHolidays.value)
@@ -102,10 +127,61 @@ watch(
   { immediate: true }
 )
 
-const activeInfo = computed(() => hoveredDateInfo.value || selectedEvaluated.value)
+const activeInfo = computed(() => {
+  if (hoveredDateInfo.value) return hoveredDateInfo.value
+  if (!selectedEvaluated.value) return null
+  const dateStr = selectedEvaluated.value.date
+  const isPast = dateStr < todayStr.value
+  const pStatus = patientDateStatusMap.value[dateStr]
+  if (isPast) {
+    return {
+      ...selectedEvaluated.value,
+      isOpen: false,
+      badge: pStatus ? `Sudah Terlewat · ${pStatus.label}` : 'Sudah Terlewat',
+      reason: pStatus
+        ? `Tanggal sudah terlewat. ${pStatus.reason}`
+        : 'Tanggal ini sudah terlewat dan tidak dapat dipilih.'
+    }
+  }
+  if (pStatus) {
+    return {
+      ...selectedEvaluated.value,
+      badge: `${selectedEvaluated.value.badge} · ${pStatus.label}`,
+      reason: `${pStatus.reason} ${selectedEvaluated.value.reason}`
+    }
+  }
+  return selectedEvaluated.value
+})
+
+function handleHoverCell(cell: CalendarCell) {
+  if (!cell.dateStr || !cell.evaluated) return
+  const pStatus = patientDateStatusMap.value[cell.dateStr]
+  if (cell.isPast) {
+    hoveredDateInfo.value = {
+      ...cell.evaluated,
+      isOpen: false,
+      badge: pStatus ? `Sudah Terlewat · ${pStatus.label}` : 'Sudah Terlewat',
+      reason: pStatus
+        ? `Tanggal sudah terlewat. ${pStatus.reason}`
+        : 'Tanggal ini sudah terlewat dan tidak dapat dipilih.'
+    }
+    return
+  }
+  if (pStatus) {
+    hoveredDateInfo.value = {
+      ...cell.evaluated,
+      badge: `${cell.evaluated.badge} · ${pStatus.label}`,
+      reason: `${pStatus.reason} ${cell.evaluated.reason}`
+    }
+    return
+  }
+  hoveredDateInfo.value = cell.evaluated
+}
 
 function selectCell(cell: CalendarCell) {
-  if (!cell.dateStr || !cell.evaluated || cell.isPast || !cell.evaluated.isOpen) return
+  if (!cell.dateStr || !cell.evaluated) return
+  handleHoverCell(cell)
+  if (cell.isPast || !cell.evaluated.isOpen) return
   emit('update:modelValue', cell.dateStr)
 }
 </script>
@@ -159,11 +235,11 @@ function selectCell(cell: CalendarCell) {
         <button
           v-else
           type="button"
-          :disabled="cell.isPast || !cell.evaluated?.isOpen"
-          :title="cell.evaluated?.reason"
+          :aria-disabled="cell.isPast || !cell.evaluated?.isOpen"
+          :title="cell.isPast ? 'Tanggal sudah terlewat' : patientDateStatusMap[cell.dateStr]?.reason || cell.evaluated?.reason"
           class="h-14 sm:h-16 p-1.5 rounded-md border flex flex-col items-center justify-between transition-all text-center relative"
           :class="[
-            modelValue === cell.dateStr && cell.evaluated?.isOpen
+            modelValue === cell.dateStr && cell.evaluated?.isOpen && !cell.isPast
               ? 'bg-[#137A7F] border-[#137A7F] text-white ring-2 ring-[#137A7F]/30'
               : cell.isPast
                 ? 'bg-[#F4F9F9] border-[#E2ECEE] text-slate-400 cursor-not-allowed'
@@ -171,21 +247,23 @@ function selectCell(cell: CalendarCell) {
                   ? 'bg-[#FFF1F2] border-rose-300 text-[#BE123C] cursor-not-allowed'
                   : cell.evaluated?.status === 'HOLIDAY_SUNDAY' || cell.evaluated?.status === 'SPECIAL_CLOSED' || cell.evaluated?.status === 'WEEKLY_CLOSED'
                     ? 'bg-slate-100 border-[#D8E6E8] text-slate-500 cursor-not-allowed'
-                    : cell.evaluated?.isReducedHours
-                      ? 'bg-[#FFFBEB] border-amber-300 text-[#0B253A] hover:border-[#137A7F] cursor-pointer'
-                      : 'bg-white border-[#D8E6E8] text-[#0B253A] hover:border-[#137A7F] hover:bg-[#EAF5F6]/50 cursor-pointer'
+                    : patientDateStatusMap[cell.dateStr]?.status === 'COMPLETED'
+                      ? 'bg-emerald-50 border-emerald-300 text-emerald-800 hover:border-[#137A7F] cursor-pointer'
+                      : cell.evaluated?.isReducedHours
+                        ? 'bg-[#FFFBEB] border-amber-300 text-[#0B253A] hover:border-[#137A7F] cursor-pointer'
+                        : 'bg-white border-[#D8E6E8] text-[#0B253A] hover:border-[#137A7F] hover:bg-[#EAF5F6]/50 cursor-pointer'
           ]"
-          @mouseenter="hoveredDateInfo = cell.evaluated"
+          @mouseenter="handleHoverCell(cell)"
           @mouseleave="hoveredDateInfo = null"
-          @focus="hoveredDateInfo = cell.evaluated"
+          @focus="handleHoverCell(cell)"
           @blur="hoveredDateInfo = null"
           @click="selectCell(cell)"
         >
           <span class="text-xs font-bold leading-none">{{ cell.dayNumber }}</span>
           <span
             v-if="cell.isPast"
-            class="text-[9px] font-medium leading-tight"
-          >Lewat</span>
+            class="text-[9px] font-semibold leading-tight truncate max-w-full"
+          >{{ patientDateStatusMap[cell.dateStr] ? patientDateStatusMap[cell.dateStr]?.label : 'Terlewat' }}</span>
           <span
             v-else-if="cell.evaluated?.status === 'HOLIDAY_NATIONAL' || cell.evaluated?.status === 'HOLIDAY_SUNDAY'"
             class="text-[9px] font-bold leading-tight truncate max-w-full"
@@ -194,6 +272,11 @@ function selectCell(cell: CalendarCell) {
             v-else-if="cell.evaluated?.status === 'SPECIAL_CLOSED' || cell.evaluated?.status === 'WEEKLY_CLOSED'"
             class="text-[9px] font-bold leading-tight truncate max-w-full text-[#BE123C]"
           >Tutup</span>
+          <span
+            v-else-if="patientDateStatusMap[cell.dateStr]"
+            class="text-[9px] font-bold leading-tight truncate max-w-full"
+            :class="modelValue === cell.dateStr ? 'text-white' : 'text-emerald-700'"
+          >{{ patientDateStatusMap[cell.dateStr]?.label }}</span>
           <span
             v-else-if="cell.evaluated?.isReducedHours"
             class="text-[9px] font-bold leading-tight truncate max-w-full"
@@ -218,6 +301,12 @@ function selectCell(cell: CalendarCell) {
       </span>
       <span class="inline-flex items-center gap-1.5 text-[#BE123C]">
         <span class="size-3 rounded-sm bg-[#FFF1F2] border border-rose-300" /> Tanggal Merah / Libur Nasional
+      </span>
+      <span class="inline-flex items-center gap-1.5 text-emerald-700">
+        <span class="size-3 rounded-sm bg-emerald-50 border border-emerald-300" /> Kunjungan Selesai
+      </span>
+      <span class="inline-flex items-center gap-1.5 text-slate-400">
+        <span class="size-3 rounded-sm bg-[#F4F9F9] border border-[#E2ECEE]" /> Sudah Terlewat
       </span>
       <span class="inline-flex items-center gap-1.5 text-slate-500">
         <span class="size-3 rounded-sm bg-slate-100 border border-[#D8E6E8]" /> Minggu (Libur) / Klinik Tutup

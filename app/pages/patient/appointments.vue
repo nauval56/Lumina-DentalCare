@@ -343,6 +343,7 @@ async function executeCancel() {
             :config="clinicScheduleData?.config"
             :holidays="clinicScheduleData?.holidays"
             :min-date="clinicScheduleData?.todayStr"
+            :patient-appointments="appointmentsData?.items || []"
             @date-evaluated="selectedDateStatus = $event"
           />
 
